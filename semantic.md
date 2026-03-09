@@ -1,7 +1,7 @@
 # ISC Ultimate Semantic Model Extension Specification
 
 ## Vision and Overview
-This specification reimagines the ISC (Implicit Semantic Channels) semantic model to achieve **full relational semantic expressivity** within the project's constraints: browser-native execution, decentralized DHT-based discovery, and lightweight embeddings. The core limitation of prior designs—independent distributions composed post-hoc via logical operators—is transcended by embedding **relations intrinsically** into the model's geometry.
+This specification reimagines the ISC (Internet Semantic Chat) semantic model to achieve **full relational semantic expressivity** within the project's constraints: browser-native execution, decentralized DHT-based discovery, and lightweight embeddings. The core limitation of prior designs—independent distributions composed post-hoc via logical operators—is transcended by embedding **relations intrinsically** into the model's geometry.
 
 Inspired by a reflective, expansive mindset (channeling that metaphorical LSD drop for coherence), we shift from "filters on a root" to a **relational hypergraph** where channels are nodes, and optional **relations** (predefined tags like "in_location", "during_time", "causes_effect") bind concepts compositionally. This creates a meta-semantic space where "AI ethics in Neo-Tokyo during 2026" is not just filtered but **represented as a unified, discoverable embedding manifold**.
 
