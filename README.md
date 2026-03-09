@@ -13,6 +13,7 @@ A fully **decentralized, browser-only** social platform that uses lightweight in
 ## Table of Contents
 
 - [Overview](#overview)
+- [Deployment Modes](#deployment-modes)
 - [Channels](#channels)
   - [Channel Schema](#channel-schema)
   - [Matching Continuity](#matching-continuity)
@@ -74,6 +75,24 @@ The key insight: rather than routing by topic *labels*, ISC routes by *semantic 
 
 ---
 
+## Deployment Modes
+
+ISC is designed for **progressive decentralization**, starting with trusted networks and evolving toward open public participation:
+
+| Mode | Phase | Use Case | Trust Assumptions | Safety Features |
+|------|-------|----------|-------------------|-----------------|
+| **Trusted Network** | Phase 1 | Private communities, organizations, invite-only groups | Pre-existing social trust; members known or vouched for | Rate limiting, mute/block, semantic filters |
+| **Federated Networks** | Phase 2 | Interconnected trusted communities; reputation bridges | Trust within communities; verified cross-community links | Reputation weighting, signed moderation events |
+| **Public Network** | Phase 2+ | Open participation; anyone can join | Potential adversaries; sybil attacks possible | Stake signaling, coherence checks, decentralised moderation |
+
+**Design rationale**: Building for trusted networks first allows ISC to:
+- Launch with minimal safety infrastructure (no complex reputation system required)
+- Validate core semantic matching and delegation in low-adversary environments
+- Iterate on user experience before hardening against sophisticated attacks
+- Grow organically through community invitations rather than cold-start problems
+
+---
+
 ## Channels
 
 A **channel** is a named, editable presence context — your stated cluster of thoughts or interests at a given moment. You can maintain several channels simultaneously and switch between them; each one independently announces your position in semantic space and accumulates its own match history and chat sessions.
@@ -127,6 +146,10 @@ A **channel** is a named, editable presence context — your stated cluster of t
 ```
 
 **Rules**: Max 5 relations (UI-enforced). Tags must come from the [Relation Ontology](#relation-ontology). Objects are free-form text or structured strings for spatiotemporal relations.
+
+**Implementation phases:**
+- **Phase 1 (Trusted Network)**: Basic multi-channel support — create, switch, and manage multiple channels; single-channel semantic matching; 1:1 chats.
+- **Phase 2 (Federated Networks)**: Relational embeddings — cross-channel semantic composition; multi-channel match aggregation; channel groupings.
 
 ### Matching Continuity
 
@@ -438,7 +461,7 @@ Group formation is fully optional — a UI toggle ("Prefer 1:1 only" / "Auto-mes
 | **Duplicate peers** | Client-side dedup by `peerID` before ANN ranking |
 | **Model fragmentation** | `model` field in payload; clients silently discard mismatched-model candidates |
 | **Channel collision** | Channel IDs are random; per-channel LSH seeds prevent cross-channel bucket contamination |
-| **Spam** | Layered approach: rate limits, reputation weighting, stake signaling, semantic coherence checks |
+| **Spam** | Phase 1: rate limits | Phase 2+: + reputation, stake, coherence checks |
 
 ---
 
@@ -597,15 +620,15 @@ Peers use `successRate` and `avgLatencyMs` to select reliable supernodes. Metric
 
 ISC operates under the following security assumptions:
 
-| Threat | Assumption | Mitigation |
-|--------|------------|------------|
-| **Malicious supernodes** | Honest-but-curious; may log requests or return incorrect embeddings | Local sanity checks + reputation weighting + optional SNARK proofs (future) |
-| **DHT bootstrap peers** | Not actively adversarial; may go offline | Multiple bootstrap peers; graceful reconnect; fallback to centralized rendezvous (opt-in) |
-| **Sybil attackers** | Can create many identities but not sustain uptime | Reputation decay + uptime history requirements + opt-in stake |
-| **Network eavesdroppers** | Can observe traffic patterns but not decrypt content | WebRTC DTLS + Noise protocol + E2E encryption for delegation requests |
-| **Browser compromise** | Out of scope (assumes honest client) | N/A — user responsible for browser security |
-| **Model poisoning** | Attacker distributes malicious embedding model | Canonical model registry (DHT-hosted, signed); clients reject unknown model hashes |
-| **Reputation gaming** | Attacker creates fake positive interactions | Mutual signing required for reputation events; time-weighted decay |
+| Threat | Assumption | Mitigation (Phase 1: Trusted) | Mitigation (Phase 2+: Public) |
+|--------|------------|-------------------------------|-------------------------------|
+| **Malicious supernodes** | Honest-but-curious; may log requests or return incorrect embeddings | Local sanity checks + trusted operator selection | + Reputation weighting + optional SNARK proofs (future) |
+| **DHT bootstrap peers** | Not actively adversarial; may go offline | Multiple bootstrap peers; graceful reconnect; fallback to centralized rendezvous (opt-in) | Same |
+| **Sybil attackers** | Can create many identities | Social trust barrier (invite-only) | Reputation decay + uptime history + opt-in stake |
+| **Network eavesdroppers** | Can observe traffic patterns but not decrypt content | WebRTC DTLS + Noise protocol + E2E encryption for delegation requests | Same |
+| **Browser compromise** | Out of scope (assumes honest client) | N/A — user responsible for browser security | Same |
+| **Model poisoning** | Attacker distributes malicious embedding model | Canonical model registry (DHT-hosted, signed); clients reject unknown model hashes | Same |
+| **Reputation gaming** | Attacker creates fake positive interactions | N/A (reputation not yet enabled) | Mutual signing + time-weighted decay |
 
 **Explicitly Out of Scope**:
 - Browser zero-day exploits
@@ -691,16 +714,26 @@ The design is inspired by **Nostr** (cryptographic authenticity, censorship resi
 - Ephemeral TTLs + no persistent profiles reduce long-term targeting.
 - WebRTC DTLS E2E encryption for all chat streams.
 
-**Implemented mechanisms:**
-- **Spam resistance**: A layered, browser-friendly approach:
-  - **Rate limiting**: Per-peer announcement caps (max 5 DHT puts/minute, 50/hour). Enforced client-side; supernodes verify and reject excess requests.
-  - **Reputation weighting**: Peers accumulate reputation via successful interactions. Low-rep announcements are deprioritized in ANN results. Reputation decays with 30-day half-life.
-  - **Stake-based signaling** (opt-in): Users may lock Lightning satoshis as sybil-resistance signal; slashed on verified abuse. *Never required for basic use.*
-  - **Semantic coherence checks**: Announcements with embeddings far from stated description (>0.6 cosine distance) are flagged for supernode review.
-  - **Mute/block propagation**: Signed mute events stored in DHT; high-rep peers carry more weight in filtering decisions.
-- **Mute / block lists**: Signed mute events stored in DHT (per user). High-rep peers can flag bad actors; clients auto-filter flagged vectors from match results.
+**Deployment modes:**
+
+ISC supports two deployment modes with different safety assumptions:
+
+| Mode | Trust Model | Safety Mechanisms |
+|------|-------------|-------------------|
+| **Trusted Network** (Phase 1) | Pre-existing social trust (invite-only, communities, organizations) | Rate limiting + mute/block + semantic filters |
+| **Public Network** (Phase 2+) | Open participation, potential adversaries | Reputation weighting + stake signaling + coherence checks + decentralised moderation |
+
+**Implemented mechanisms (Trusted Network mode):**
+- **Rate limiting**: Per-peer announcement caps (max 5 DHT puts/minute, 50/hour). Enforced client-side; supernodes verify and reject excess requests.
+- **Mute / block lists**: Signed mute events stored in DHT (per user). Clients auto-filter flagged vectors from match results.
 - **Semantic filters**: Sim-threshold controls (per channel) let users define their own "safe zone" — content far from their channel's vector space is naturally deprioritised.
 - **Harassment exit**: Auto-decay chats when similarity drops below threshold (thought drift = natural exit). One-click mute with propagation.
+
+**Planned mechanisms (Public Network mode — Phase 2):**
+- **Reputation weighting**: Peers accumulate reputation via successful interactions. Low-rep announcements are deprioritized in ANN results. Reputation decays with 30-day half-life.
+- **Stake-based signaling** (opt-in): Users may lock Lightning satoshis as sybil-resistance signal; slashed on verified abuse. *Never required for basic use.*
+- **Semantic coherence checks**: Announcements with embeddings far from stated description (>0.6 cosine distance) are flagged for supernode review.
+- **Mute/block propagation**: Signed mute events stored in DHT; high-rep peers carry more weight in filtering decisions.
 - **Decentralised moderation**: Signed reports stored in DHT; clients weight them by reporter reputation. No central moderation team; safety emerges from network geometry.
 
 ### Privacy
@@ -853,11 +886,14 @@ ISC's P2P and semantic foundations support a full decentralised social network �
 
 ### Phase 1: Core Reliability (Q1–Q2 2026)
 
+**Target deployment**: Trusted Networks (invite-only, private communities)
+
 Foundation: semantic matching + peer discovery + delegation infrastructure.
 
 - [ ] MVP — single-channel semantic matching + 1:1 WebRTC chat
+- [ ] Basic multi-channel UI — create, switch, manage multiple channels
 - [ ] Supernode delegation protocol + capability advertisement
-- [ ] Layered anti-spam (rate limits + reputation + semantic coherence)
+- [ ] Layered anti-spam (rate limits only; reputation/stake deferred to Phase 2)
 - [ ] Model version negotiation + compatibility shards
 - [ ] Device tier auto-detection + delegate mode UI
 - [ ] Threat model validation + security audit (community)
@@ -867,10 +903,12 @@ Foundation: semantic matching + peer discovery + delegation infrastructure.
 
 ### Phase 2: Scale & Safety (Q3–Q4 2026)
 
-Hardening: multi-channel support + reputation system + moderation primitives.
+**Target deployment**: Federated Networks → Public Networks
 
-- [ ] Multi-channel support + relational embeddings
-- [ ] Reputation system + signed moderation events
+Hardening: relational embeddings + reputation system + moderation primitives.
+
+- [ ] Relational embeddings — cross-channel semantic composition
+- [ ] Reputation system + signed moderation events (for public network mode)
 - [ ] Offline queue + reconnect logic
 - [ ] Delegation health metrics + supernode ranking
 - [ ] PWA — installable on mobile, offline-capable shell
@@ -881,6 +919,8 @@ Hardening: multi-channel support + reputation system + moderation primitives.
 
 ### Phase 3: Social Layer (2027)
 
+**Target deployment**: Public Networks (open participation)
+
 Features: posts, feeds, communities — built on reliable foundation.
 
 - [ ] Posts & semantic feeds ("For You" + "Following")
@@ -890,7 +930,7 @@ Features: posts, feeds, communities — built on reliable foundation.
 - [ ] Audio Spaces (WebRTC mesh audio)
 - [ ] Video calls (WebRTC, parity with X)
 - [ ] Chaos mode — random perturbation for serendipitous cross-topic matches
-- [ ] Crypto tipping / Lightning Network (opt-in monetisation)
+- [ ] Crypto tipping / Lightning Network (opt-in monetisation) — *enables stake-based signaling*
 - [ ] ZK proximity proofs — prove sim > threshold without revealing exact vector
 
 **Success criteria**: 10,000+ DAU; <1% critical error rate; positive supernode economics (tips cover infrastructure costs for 20% of supernodes).
