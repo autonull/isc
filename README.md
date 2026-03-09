@@ -1,6 +1,6 @@
-# ISC — Idea Space Chat
+# ISC — Internet Semantic Chat
 
-> *Find your people by the shape of your thoughts.*
+> *Meet your thought neighbors.*
 
 A fully **decentralized, browser-only** chat platform that uses lightweight in-browser LLM embeddings to place your ideas in a shared vector space — then serendipitously connects you with peers whose mental distributions are closest to yours. No servers. No accounts. No surveillance. Just thought and conversation.
 
