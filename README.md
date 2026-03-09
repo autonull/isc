@@ -21,6 +21,7 @@ A fully **decentralized, browser-only** social platform that uses lightweight in
   - [Compositional Embeddings](#compositional-embeddings)
   - [Relational Matching](#relational-matching)
 - [Embedding Standards](#embedding-standards)
+  - [Model Version Negotiation](#model-version-negotiation)
 - [Architecture](#architecture)
   - [1. Peer Initialization](#1-peer-initialization)
   - [2. Channels & Distributions](#2-channels--distributions)
@@ -28,6 +29,8 @@ A fully **decentralized, browser-only** social platform that uses lightweight in
   - [4. Querying for Proximals](#4-querying-for-proximals)
   - [5. Forming Chats](#5-forming-chats)
   - [6. Handling Dynamics](#6-handling-dynamics)
+  - [7. Supernode Delegation Architecture](#7-supernode-delegation-architecture)
+  - [8. Threat Model](#8-threat-model)
 - [Device Tiers](#device-tiers)
 - [Tech Stack](#tech-stack)
 - [Safety, Privacy & Authenticity](#safety-privacy--authenticity)
@@ -41,8 +44,10 @@ A fully **decentralized, browser-only** social platform that uses lightweight in
   - [Communities](#communities)
   - [Exceeding Centralized Platforms](#exceeding-centralized-platforms)
 - [Getting Started](#getting-started)
+  - [Testing Supernode Delegation Locally](#testing-supernode-delegation-locally)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
+  - [Security Review Checklist](#security-review-checklist)
 - [License](#license)
 
 ---
@@ -270,6 +275,38 @@ Embedding spaces from different models are not directly comparable, even at iden
 }
 ```
 
+### Model Version Negotiation
+
+To prevent network fragmentation across embedding model versions:
+
+1. **Announcement field**: Every DHT entry includes `model_version` with hash:
+   ```json
+   "model": "Xenova/all-MiniLM-L6-v2 @sha256:abc123def456"
+   ```
+
+2. **Compatibility groups**: Clients maintain a `supported_models` list. During query refinement, candidates with unsupported models are silently filtered. Peers announce their supported models in bootstrap handshake.
+
+3. **Graceful migration**: When a new canonical model is adopted:
+   - Old-model peers continue operating in a "compatibility shard" (separate LSH buckets)
+   - Dual-announcement mode (optional, High-tier only) allows peers to announce in both old and new spaces for 90 days
+   - After 90 days, old-model announcements expire naturally via TTL
+   - Clients show migration prompt when >50% of matches use newer model
+
+4. **Community model registry**: A signed, DHT-hosted manifest lists approved model versions and migration timelines:
+   ```json
+   {
+     "type": "model_registry",
+     "canonical": "Xenova/all-MiniLM-L6-v2 @sha256:abc123",
+     "deprecated": ["Xenova/all-MiniLM-L6-v2 @sha256:old456"],
+     "migrationDeadline": 1772936000,
+     "signature": "community_multisig_here"
+   }
+   ```
+
+5. **Never mix models**: Cosine similarity is only meaningful within the same embedding space. Clients must never compute similarity across different model versions.
+
+> **Model update process**: Community proposes new model → 30-day comment period → Multisig signing by trusted maintainers → DHT registry update → Clients auto-fetch on next launch.
+
 ---
 
 ## Architecture
@@ -401,7 +438,180 @@ Group formation is fully optional — a UI toggle ("Prefer 1:1 only" / "Auto-mes
 | **Duplicate peers** | Client-side dedup by `peerID` before ANN ranking |
 | **Model fragmentation** | `model` field in payload; clients silently discard mismatched-model candidates |
 | **Channel collision** | Channel IDs are random; per-channel LSH seeds prevent cross-channel bucket contamination |
-| **Spam** | Lightweight PoW (hashcash-style) required on DHT puts |
+| **Spam** | Layered approach: rate limits, reputation weighting, stake signaling, semantic coherence checks |
+
+---
+
+### 7. Supernode Delegation Architecture
+
+ISC supports **capability-aware delegation**: high-tier peers optionally act as *supernodes* to assist Low/Minimal-tier peers with computationally expensive operations—without compromising decentralization or privacy.
+
+#### Delegation Flow
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Low-Tier Peer  │────▶│   Supernode     │────▶│  DHT / Network  │
+│  (Mobile)       │     │  (Desktop)      │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+        │                       │                       │
+        │ 1. Request assistance │                       │
+        │    - Embed text       │                       │
+        │    - Run ANN query    │                       │
+        │    - Verify sigs      │                       │
+        │◀──────────────────────│                       │
+        │ 2. Receive results    │                       │
+        │    - Encrypted        │                       │
+        │    - Signed           │                       │
+        │    - Locally verified │                       │
+        ▼                       ▼                       ▼
+```
+
+#### Supernode Requirements
+
+| Resource | Minimum | Recommended |
+|----------|---------|-------------|
+| **CPU** | 4 cores | 8+ cores |
+| **RAM** | 4 GB | 8+ GB |
+| **Bandwidth** | 10 Mbps up | 50+ Mbps up |
+| **Uptime** | 4 hours/day | 12+ hours/day |
+| **Storage** | 2 GB (model cache) | 10+ GB |
+
+#### Delegation Protocol
+
+1. **Capability Advertisement**: Supernodes broadcast signed `delegate_capability` announcement to DHT:
+   ```json
+   {
+     "type": "delegate_capability",
+     "peerID": "12D3KooW...",
+     "services": ["embed", "ann_query", "sig_verify"],
+     "rateLimit": {"requestsPerMinute": 10, "maxConcurrent": 5},
+     "model": "Xenova/all-MiniLM-L6-v2 @sha256:abc123",
+     "uptime": 0.95,
+     "signature": "ed25519_signature_here"
+   }
+   ```
+
+2. **Secure Request**: Low-tier peers encrypt requests with supernode's public key (from capability announcement) and sign with their own key:
+   ```json
+   {
+     "type": "delegate_request",
+     "requestID": "uuid_v4",
+     "service": "embed",
+     "payload": "encrypted_text_description",
+     "requesterPubKey": "ed25519_public_key",
+     "timestamp": 1741400000,
+     "signature": "ed25519_signature_here"
+   }
+   ```
+
+3. **Verifiable Response**: Supernodes return results with cryptographic proof:
+   ```json
+   {
+     "type": "delegate_response",
+     "requestID": "uuid_v4",
+     "result": {
+       "embedding": [0.12, -0.07, ...],
+       "model": "Xenova/all-MiniLM-L6-v2 @sha256:abc123",
+       "norm": 1.0
+     },
+     "supernodePubKey": "ed25519_public_key",
+     "timestamp": 1741400005,
+     "signature": "ed25519_signature_here"
+   }
+   ```
+
+4. **Local Verification**: Requesting peer verifies:
+   - Supernode signature matches advertised public key
+   - Embedding norm ≈ 1.0 (±0.01 tolerance)
+   - Model version matches expected canonical model
+   - Request ID matches original request
+   - Optional: Cross-check subset with local minimal model
+
+#### Trust & Safety
+
+- **No blind trust**: All delegated results are cryptographically signed and locally sanity-checked.
+- **Reputation-weighted selection**: Peers prefer supernodes with high `uptime` and positive interaction history.
+- **Sybil resistance**: Supernodes must maintain 7-day uptime history to be highly ranked; opt-in stake boosts visibility.
+- **Privacy preserved**: Requests are E2E encrypted; supernodes see only channel descriptions—never raw chat content.
+- **Graceful degradation**: If no supernodes available, Low/Minimal peers use smaller models or word-hash fallback.
+
+#### Supernode Incentives
+
+| Incentive Type | Description |
+|----------------|-------------|
+| **Reputation badges** | Visible "Trusted Supernode" badge in profile; boosts match priority |
+| **Priority queuing** | Supernodes receive faster ANN results from other supernodes |
+| **Optional tips** | Lightning Network micropayments for verified assistance (opt-in) |
+| **Governance weight** | High-rep supernodes carry more weight in community moderation decisions |
+| **Early feature access** | Beta features rolled out to active supernodes first |
+
+#### Configuration
+
+```javascript
+// Peer config example
+const peerConfig = {
+  tier: 'low',
+  delegation: {
+    enabled: true,
+    preferLocal: true,        // Try local first, delegate only if needed
+    trustedSupernodes: [],    // Optional: manually pinned supernode peerIDs
+    maxDelegationsPerMinute: 3,
+    maxResponseLatencyMs: 5000
+  },
+  supernode: {
+    enabled: false,           // Set true to serve others
+    maxConcurrentRequests: 5,
+    advertiseUptime: true
+  }
+};
+```
+
+#### Delegation Privacy Guarantees
+
+- **Request encryption**: Delegation requests encrypted with supernode's public key; only intended supernode can decrypt.
+- **No logging policy**: Supernodes expected to discard request contents after computing results. *Future work: ZK proofs of correct computation without revealing inputs.*
+- **Minimal exposure**: Only channel descriptions (not chat messages) are delegated. Users can disable delegation for sensitive channels via Settings.
+- **Auditability**: Supernodes publish signed uptime/throughput metrics; anomalous behavior can be flagged by community.
+- **User control**: Delegation can be disabled per-channel or globally at any time.
+
+#### Delegation Health Metric
+
+Supernodes announce a `delegation_health` signal every 5 minutes:
+```json
+{
+  "type": "delegation_health",
+  "peerID": "12D3KooW...",
+  "successRate": 0.98,
+  "avgLatencyMs": 250,
+  "requestsServed24h": 142,
+  "timestamp": 1741400000,
+  "signature": "ed25519_signature_here"
+}
+```
+
+Peers use `successRate` and `avgLatencyMs` to select reliable supernodes. Metrics below 0.85 success rate trigger automatic deprioritization.
+
+---
+
+### 8. Threat Model
+
+ISC operates under the following security assumptions:
+
+| Threat | Assumption | Mitigation |
+|--------|------------|------------|
+| **Malicious supernodes** | Honest-but-curious; may log requests or return incorrect embeddings | Local sanity checks + reputation weighting + optional SNARK proofs (future) |
+| **DHT bootstrap peers** | Not actively adversarial; may go offline | Multiple bootstrap peers; graceful reconnect; fallback to centralized rendezvous (opt-in) |
+| **Sybil attackers** | Can create many identities but not sustain uptime | Reputation decay + uptime history requirements + opt-in stake |
+| **Network eavesdroppers** | Can observe traffic patterns but not decrypt content | WebRTC DTLS + Noise protocol + E2E encryption for delegation requests |
+| **Browser compromise** | Out of scope (assumes honest client) | N/A — user responsible for browser security |
+| **Model poisoning** | Attacker distributes malicious embedding model | Canonical model registry (DHT-hosted, signed); clients reject unknown model hashes |
+| **Reputation gaming** | Attacker creates fake positive interactions | Mutual signing required for reputation events; time-weighted decay |
+
+**Explicitly Out of Scope**:
+- Browser zero-day exploits
+- User key compromise (private key stored in IndexedDB; user responsible for passphrase)
+- Physical device theft
+- Government-level traffic correlation attacks (Tor/I2P integration mitigates but doesn't eliminate)
 
 ---
 
@@ -409,12 +619,14 @@ Group formation is fully optional — a UI toggle ("Prefer 1:1 only" / "Auto-mes
 
 ISC adapts to device RAM, CPU, and network at startup. A capability probe runs before any model loads — it measures `navigator.hardwareConcurrency`, a quick WASM microbenchmark, and network type — then selects a tier:
 
-| Tier | Target | Embedding model | Relations | ANN | Hashes | Refresh |
-|---|---|---|---|---|---|---|
-| **High** | Desktop / modern laptop | `all-MiniLM-L6-v2` (384-dim, ~22 MB) | All (max 5) | HNSW via usearch | 20 | 5 min |
-| **Mid** | Mid-range phone / older laptop | `paraphrase-MiniLM-L3-v3` (384-dim, ~8 MB) | Root + 2 | HNSW lite | 12 | 8 min |
-| **Low** | Budget phone / slow connection | `gte-tiny` (384-dim, ~4 MB) | Root only | Linear scan | 8 | 15 min |
-| **Minimal** | Very constrained / 2G | Word-hash fallback (no model) | Root only | Hamming | 6 | 20 min |
+| Tier | Target | Embedding Model | Relations | ANN | Hashes | Refresh | **Delegation** | **Delegate Mode** |
+|------|--------|-----------------|-----------|-----|--------|---------|----------------|-------------------|
+| **High** | Desktop / modern laptop | `all-MiniLM-L6-v2` (384-dim, ~22 MB) | All (max 5) | HNSW via usearch | 20 | 5 min | ✅ Can request | ✅ Can serve (opt-in) |
+| **Mid** | Mid-range phone / older laptop | `paraphrase-MiniLM-L3-v3` (384-dim, ~8 MB) | Root + 2 | HNSW lite | 12 | 8 min | ✅ Can request | ⚠️ Limited serve |
+| **Low** | Budget phone / slow connection | `gte-tiny` (384-dim, ~4 MB) | Root only | Linear scan | 8 | 15 min | ✅ Can request | ❌ Cannot serve |
+| **Minimal** | Very constrained / 2G | Word-hash fallback (no model) | Root only | Hamming | 6 | 20 min | ✅ Can request | ❌ Cannot serve |
+
+> **Delegate Mode**: High-tier peers can opt into `supernode` mode via Settings. When enabled, they advertise delegation capabilities to the DHT and assist Low/Minimal peers with embedding, ANN, or verification tasks. All delegated work is cryptographically signed and locally verifiable—no blind trust required. See [Supernode Delegation Architecture](#7-supernode-delegation-architecture) for requirements.
 
 **Other tier-aware behaviours:**
 
@@ -480,7 +692,12 @@ The design is inspired by **Nostr** (cryptographic authenticity, censorship resi
 - WebRTC DTLS E2E encryption for all chat streams.
 
 **Implemented mechanisms:**
-- **Spam resistance**: Lightweight PoW (hashcash-style, inspired by Nostr NIP-13) required on every DHT `put`. Raises the cost of flooding without blocking legitimate peers.
+- **Spam resistance**: A layered, browser-friendly approach:
+  - **Rate limiting**: Per-peer announcement caps (max 5 DHT puts/minute, 50/hour). Enforced client-side; supernodes verify and reject excess requests.
+  - **Reputation weighting**: Peers accumulate reputation via successful interactions. Low-rep announcements are deprioritized in ANN results. Reputation decays with 30-day half-life.
+  - **Stake-based signaling** (opt-in): Users may lock Lightning satoshis as sybil-resistance signal; slashed on verified abuse. *Never required for basic use.*
+  - **Semantic coherence checks**: Announcements with embeddings far from stated description (>0.6 cosine distance) are flagged for supernode review.
+  - **Mute/block propagation**: Signed mute events stored in DHT; high-rep peers carry more weight in filtering decisions.
 - **Mute / block lists**: Signed mute events stored in DHT (per user). High-rep peers can flag bad actors; clients auto-filter flagged vectors from match results.
 - **Semantic filters**: Sim-threshold controls (per channel) let users define their own "safe zone" — content far from their channel's vector space is naturally deprioritised.
 - **Harassment exit**: Auto-decay chats when similarity drops below threshold (thought drift = natural exit). One-click mute with propagation.
@@ -499,13 +716,19 @@ The design is inspired by **Nostr** (cryptographic authenticity, censorship resi
 - **Metadata minimisation**: Vector-only announcements for discovery; raw text revealed only in direct WebRTC chats.
 - **Plausible deniability**: Channel spread (σ) adds deliberate fuzz to announced position — exact thoughts are not recoverable from the vector alone.
 - **Data sovereignty**: Users control full export/delete of all local data. No cross-session tracking without explicit follows.
+- **Delegation privacy**: When using supernode delegation:
+  - Requests are E2E encrypted with supernode's public key
+  - Only channel descriptions are delegated (never chat messages)
+  - Users can disable delegation per-channel via Settings
+  - Supernodes expected to discard request contents after computation
+  - Future: ZK proofs enable verification without revealing inputs
 
 **Comparison:**
 
 | Aspect | ISC | Nostr | X (centralized) |
 |---|---|---|---|
 | **Authenticity** | Keypair signing + libp2p | Keypair signing | Platform verification |
-| **Safety** | PoW + semantic filters + mutes | Client-side + propagation | Central bans + biases |
+| **Safety** | Layered anti-spam + semantic filters + mutes | Client-side + propagation | Central bans + biases |
 | **Privacy** | No servers; optional Tor; ephemeral keys | Public-by-default; Tor mitigable | Full surveillance |
 | **Censorship resistance** | DHT + WebRTC; no deplatforming | Relay-based; resilient | Platform-controlled |
 
@@ -593,59 +816,117 @@ ISC's P2P and semantic foundations support a full decentralised social network �
 
 > **Testing locally**: open two tabs, wait ~10 s for DHT bootstrap, then embed similar text in both. They should surface each other as a match.
 
+### Testing Supernode Delegation Locally
+
+1. **Start a supernode**:
+   ```bash
+   # In one terminal
+   npx serve . --port 8080
+   # Open http://localhost:8080?tier=high&supernode=true
+   # Enable "Supernode Mode" in Settings → Delegation
+   ```
+
+2. **Start a low-tier client**:
+   ```bash
+   # In another terminal
+   npx serve . --port 8081
+   # Open http://localhost:8081?tier=low&delegate=true
+   # Enable "Use Delegation" in Settings → Delegation
+   ```
+
+3. **Observe delegation**:
+   - The low-tier client requests embedding assistance from the supernode
+   - Browser DevTools → Network tab shows encrypted delegation messages (protocol: `/isc/delegate/1.0`)
+   - Both peers should match semantically and form a chat within 30 seconds
+   - Verify in DevTools Console: `peer.delegation.stats` shows request/response counts
+
+4. **Test fallback**:
+   - Close the supernode tab
+   - Low-tier client should gracefully degrade to local minimal model
+   - Match quality decreases but functionality remains
+
+> **Note**: Local testing uses self-signed keys. Production delegation requires proper key management, reputation bootstrapping, and NAT traversal configuration.
+
 ---
 
 ## Roadmap
 
-**Core**
-- [ ] MVP — single-page app: channel → embed → announce → query → chat
-- [ ] Channel UI — create, rename, edit, reorder, archive
-- [ ] Relation builder UI — ontology dropdowns, structured inputs for spatiotemporal
-- [ ] Device tier auto-detection + manual override in Settings
+### Phase 1: Core Reliability (Q1–Q2 2026)
 
-**Semantic model**
-- [ ] Relational distributions — compositional fused embeddings
-- [ ] Multi-sample DHT announcements (root + relations, prefixed keys)
-- [ ] Relational matching — bipartite hypergraph alignment
-- [ ] Spatiotemporal similarity boost (Haversine + interval overlap)
-- [ ] Distribution UI — per-channel spread slider
-- [ ] 2D visualisation — PCA/UMAP projection of live peer cloud per channel
+Foundation: semantic matching + peer discovery + delegation infrastructure.
 
-**Matching & reliability**
-- [ ] Seeded LSH — deterministic bucket placement per channel ID
-- [ ] Model version field + cross-model filtering in query pipeline
-- [ ] Auto-refresh ranked match list (background, 30–60 s)
-- [ ] Reconnect / stream-recovery logic
-- [ ] Offline queue — buffer messages sent while temporarily offline
+- [ ] MVP — single-channel semantic matching + 1:1 WebRTC chat
+- [ ] Supernode delegation protocol + capability advertisement
+- [ ] Layered anti-spam (rate limits + reputation + semantic coherence)
+- [ ] Model version negotiation + compatibility shards
+- [ ] Device tier auto-detection + delegate mode UI
+- [ ] Threat model validation + security audit (community)
+- [ ] NAT traversal improvements (circuit relay pool)
 
-**Safety & identity**
-- [ ] Keypair generation (ed25519, Web Crypto API) + signed DHT payloads
-- [ ] PoW anti-spam on DHT puts
-- [ ] Mute / block propagation via signed DHT events
-- [ ] Tor / I2P transport integration (opt-in privacy mode)
-- [ ] ZK proximity proofs — prove sim > threshold without revealing exact vector (long-term)
+**Success criteria**: 50+ concurrent users; <5% connection failure rate; <10s median time-to-first-match.
 
-**Social layer**
-- [ ] Posts & semantic feed ("For You" + "Following")
+### Phase 2: Scale & Safety (Q3–Q4 2026)
+
+Hardening: multi-channel support + reputation system + moderation primitives.
+
+- [ ] Multi-channel support + relational embeddings
+- [ ] Reputation system + signed moderation events
+- [ ] Offline queue + reconnect logic
+- [ ] Delegation health metrics + supernode ranking
+- [ ] PWA — installable on mobile, offline-capable shell
+- [ ] IPFS deployment — zero-infra hosting for static bundle
+- [ ] Community model registry + migration tooling
+
+**Success criteria**: 1,000+ DAU; <10% delegation failure rate; sustainable supernode participation (10% of High-tier peers).
+
+### Phase 3: Social Layer (2027)
+
+Features: posts, feeds, communities — built on reliable foundation.
+
+- [ ] Posts & semantic feeds ("For You" + "Following")
 - [ ] Reactions (likes, reposts, replies, quotes)
 - [ ] Profiles & follow / Web of Trust
 - [ ] Communities — shared channel distributions
 - [ ] Audio Spaces (WebRTC mesh audio)
 - [ ] Video calls (WebRTC, parity with X)
 - [ ] Chaos mode — random perturbation for serendipitous cross-topic matches
-- [ ] Local history — optional session persistence via IndexedDB
+- [ ] Crypto tipping / Lightning Network (opt-in monetisation)
+- [ ] ZK proximity proofs — prove sim > threshold without revealing exact vector
 
-**Scale & distribution**
-- [ ] Gossip KNN — peers share neighbour lists for > 10k users
-- [ ] PWA — installable on mobile, offline-capable shell
-- [ ] IPFS deployment — zero-infra hosting for the static bundle
-- [ ] Crypto micropayments / Lightning Network tips (opt-in monetisation)
+**Success criteria**: 10,000+ DAU; <1% critical error rate; positive supernode economics (tips cover infrastructure costs for 20% of supernodes).
+
+### Phase 4: Ecosystem (2028+)
+
+Expansion: interop, innovation, sustainability.
+
+- [ ] AT Protocol / Bluesky interop
+- [ ] Mobile native apps (React Native / Flutter)
+- [ ] Advanced moderation tools (community courts)
+- [ ] DAO governance for protocol upgrades
+- [ ] Enterprise deployment options (private ISC instances)
 
 ---
 
 ## Contributing
 
 Pull requests, ideas, and experiments welcome. This is an early-stage prototype — the goal is to learn what emerges when people navigate by thought rather than by URL.
+
+### Security Review Checklist
+
+Before merging delegation-related or cryptographic PRs, ensure:
+
+- [ ] All delegated responses are cryptographically signed (ed25519)
+- [ ] Local verification logic has unit tests for edge cases (invalid sigs, malformed embeddings, timeout)
+- [ ] Rate limiting is enforced on both request and response paths
+- [ ] Fallback behavior is tested (no supernodes available, network partition)
+- [ ] Memory usage is bounded (no unbounded request queues; max 100 pending delegations)
+- [ ] Encryption keys are never logged or exposed in DevTools
+- [ ] Model version checks prevent cross-model similarity computation
+- [ ] Reputation events require mutual signing (both parties confirm interaction)
+- [ ] DHT announcements include TTL and are signed
+- [ ] WebRTC streams use DTLS encryption (verify via browser DevTools)
+
+PRs failing any checklist item will be rejected without review.
 
 1. Fork the repo
 2. Create a feature branch: `git checkout -b feature/my-idea`
