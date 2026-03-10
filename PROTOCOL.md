@@ -13,6 +13,7 @@ const PROTOCOL_ANNOUNCE = '/isc/announce/1.0';
 const PROTOCOL_POST = '/isc/post/1.0';
 const PROTOCOL_FOLLOW = '/isc/follow/1.0';
 const PROTOCOL_DM = '/isc/dm/1.0';
+const PROTOCOL_MAILBOX = '/isc/mailbox/1.0';
 ```
 
 ---
@@ -294,9 +295,13 @@ async function handleChatStream(stream: Stream) {
 }
 ```
 
-### WebRTC Signaling & Dial Protocol
+### WebRTC Signaling, Mailboxes & Dial Protocol
 
-Because WebRTC requires SDP offer/answer exchange before connecting, peers use a dedicated Libp2p PubSub topic (`/isc/signal/<peerID>`) for signaling, relying on community relays/supernodes for message routing.
+Because WebRTC requires SDP offer/answer exchange before connecting, peers use a dedicated Libp2p PubSub topic (`/isc/signal/<peerID>`) for signaling when online.
+
+To solve the "Browser Backgrounding" problem (where mobile OSs kill WebSockets), peers register a **Mailbox** with a community relay. The Mailbox protocol (`/isc/mailbox/1.0`) buffers signaling messages and chat payloads.
+
+When a message arrives for a sleeping peer, the Mailbox relay triggers a **Web Push Notification** to wake the client's Service Worker.
 
 ```typescript
 interface SignalMessage {
@@ -309,8 +314,11 @@ interface SignalMessage {
 
 ```javascript
 async function initiateChat(peerID: string, channel: Channel): Promise<Stream> {
-  // SDP exchange happens out-of-band via PubSub:
+  // 1. Attempt PubSub signaling (fast path)
   // node.pubsub.publish(`/isc/signal/${peerID}`, encode(offerSignal))
+
+  // 2. Fallback: If no PubSub ack, send to peer's registered Mailbox relay
+  // await sendToMailbox(peer.mailboxRelayID, peerID, offerSignal);
 
   const stream = await node.dialProtocol(peerID, PROTOCOL_CHAT);
   

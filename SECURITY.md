@@ -122,11 +122,14 @@ See [SOCIAL.md](SOCIAL.md#web-of-trust) for the `ReputationScore` interface.
 
 Peers accumulate reputation via successful interactions. Low-rep announcements deprioritized in ANN results. Reputation decays with 30-day half-life.
 
-**Sybil resistance**:
+**Sybil resistance (Cryptographic Vouching)**:
 
-- Mutual signing requirement (both parties confirm interaction)
-- Time-weighted decay
-- 7-day bootstrapping period for new peers
+Without central accounts, ISC relies on a "Web of Trust" model to prevent attackers from creating millions of Sybil identities to flood the network.
+
+- **Vouch Signatures**: A new peer is "unverified" until they receive a cryptographic vouch from an established, high-reputation peer.
+- **Transitive Reputation**: The initial reputation of a new peer is a fraction of the peer that vouched for them.
+- **Slashed Trust**: If a vouched peer engages in spam and gets muted, the muting propagates negatively to the *voucher's* reputation. This creates economic pressure to only vouch for real humans.
+- **Bootstrapping**: First 10,000 users are vouched by the genesis community keys.
 
 ### Reputation Score Calculation
 

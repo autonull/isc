@@ -75,39 +75,47 @@ Supernodes broadcast signed `delegate_capability` announcements to DHT:
 
 ### 1. Secure Request
 
-Low-tier peers encrypt requests using the supernode's public encryption key and sign the request with their own signing key (using the dual-key system described in `SECURITY.md`):
+Low-tier peers encrypt requests using an ECIES-style scheme: they generate an ephemeral ECDH keypair, derive a shared secret with the supernode's public encryption key, encrypt the payload, and transmit the ephemeral public key. They then sign the entire request with their identity signing key (from the dual-key system described in `SECURITY.md`):
 
 ```typescript
 interface DelegateRequest {
   type: 'delegate_request';
   requestID: string;
   service: 'embed' | 'ann_query' | 'sig_verify';
-  payload: Uint8Array;         // Encrypted with supernode's public encryption key (ECDH/AES-GCM)
+  payload: Uint8Array;         // Encrypted using ephemeral ECDH + AES-GCM
+  ephemeralPubKey: Uint8Array; // Ephemeral ECDH public key required for supernode decryption
   requesterPubKey: Uint8Array; // Requester's public signing key (ed25519)
   timestamp: number;
-  signature: Uint8Array;       // Signed by requester's ed25519 key
+  signature: Uint8Array;       // Signed by requester's ed25519 identity key
 }
 ```
 
 **Request Encryption (Native Web Crypto API)**:
 
 ```javascript
-// Example using ECDH for key agreement and AES-GCM for encryption
+// ECIES-style encryption generating an ephemeral ECDH keypair per request
 async function encryptForSupernode(
   plaintext: Uint8Array,
-  supernodeEncryptionPubKey: CryptoKey,
-  localEncryptionPrivKey: CryptoKey
-): Promise<{ ciphertext: Uint8Array, iv: Uint8Array }> {
-  // 1. Derive shared secret
+  supernodeEncryptionPubKey: CryptoKey
+): Promise<{ ciphertext: Uint8Array, iv: Uint8Array, ephemeralPubKey: CryptoKey }> {
+
+  // 1. Generate an ephemeral ECDH keypair
+  const ephemeralKeys = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' },
+    true,
+    ['deriveKey']
+  );
+
+  // 2. Derive shared secret using the supernode's public key
   const sharedSecret = await crypto.subtle.deriveKey(
     { name: 'ECDH', public: supernodeEncryptionPubKey },
-    localEncryptionPrivKey,
+    ephemeralKeys.privateKey,
     { name: 'AES-GCM', length: 256 },
     false,
     ['encrypt']
   );
 
-  // 2. Encrypt payload
+  // 3. Encrypt payload
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
@@ -115,7 +123,7 @@ async function encryptForSupernode(
     plaintext
   ));
 
-  return { ciphertext, iv };
+  return { ciphertext, iv, ephemeralPubKey: ephemeralKeys.publicKey };
 }
 ```
 
@@ -229,14 +237,15 @@ function scoreSupernode(cap: DelegateCapability, stats: SupernodeStats): number 
 
 ## Delegation Services
 
-### Embed Service
+### Embed & Translate Service
 
-Compute embedding for text:
+Compute an embedding for text, optionally translating from an old model to a new canonical model during network migrations:
 
 ```typescript
 interface EmbedRequest {
   text: string;
   model: string;
+  targetModel?: string; // Optional: used for Model Bridging
 }
 
 interface EmbedResponse {

@@ -394,19 +394,30 @@ async function getSuggestedFollows(channel: Channel, limit: number = 10): Promis
 }
 ```
 
-### Web of Trust
+### Web of Trust (Cryptographic Vouching)
+
+ISC uses a transitive Web of Trust to mitigate Sybil attacks without requiring servers or Proof-of-Work.
 
 ```typescript
 interface ReputationScore {
   peerID: string;
   score: number;        // 0.0 - 1.0
-  mutualFollows: number;
+  vouchedBy: string;    // peerID of the sponsor who invited them
   interactionHistory: Interaction[];
   halfLifeDays: number; // 30-day decay
 }
 
-// Mutual follows accumulate reputation scores
-// High-rep peers carry more weight in mute/flag propagation
+interface VouchEvent {
+  type: 'vouch';
+  voucher: string;
+  vouchee: string;
+  timestamp: number;
+  signature: Uint8Array; // Signed by voucher
+}
+
+// 1. New peers require a VouchEvent from an existing peer to bypass low-tier rate limits.
+// 2. The voucher puts their own reputation score on the line.
+// 3. If the vouchee acts maliciously (receives mutes/blocks), the voucher's reputation is slashed.
 ```
 
 ---
