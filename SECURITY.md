@@ -192,6 +192,7 @@ Signed reports stored in DHT. Clients weight reports by reporter reputation. No 
 | **Vector-only announcements** | Only vectors + peerID announced publicly |
 | **Raw text never broadcast** | Unless user explicitly posts |
 | **E2E encrypted chats** | WebRTC DTLS + Noise protocol |
+| **Sealed Box Encryption** | Libsodium `crypto_box_seal` (requires converting Web Crypto `ed25519` keys to `x25519` using `crypto_sign_ed25519_pk_to_curve25519`) |
 
 ### Enhanced Capabilities
 

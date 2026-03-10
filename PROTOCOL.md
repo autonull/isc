@@ -314,32 +314,39 @@ async function initiateChat(peerID: string, channel: Channel): Promise<Stream> {
 
 ### Group Chat Formation
 
-**Density Threshold**: 3+ peers within 0.15 cosine similarity of centroid
+**Density Threshold**: 3+ peers within mutually dense proximity (all pairwise similarities > 0.85).
 
-**Maximum Group Size**: 8 peers (WebRTC connection limit consideration)
+**Maximum Group Size**: 8 peers (WebRTC connection limit consideration).
 
 **Formation Protocol**:
 
-1. When peer detects 3+ peers within 0.15 similarity:
-   - Compute centroid: `mean([vec1, vec2, ...])`
-   - Generate room ID: `sha256(centroid + modelHash + timestamp_hour)`
-   - Announce room membership to DHT at `/isc/group/<roomID>`
+1. **Detection & Initiation**:
+   - When a peer detects 3+ peers (including itself) forming a complete graph where all edge weights > 0.85 similarity.
+   - To prevent race conditions, only the peer with the lexicographically **highest** `peerID` in the cluster initiates the group.
 
-2. Mesh Formation:
-   - First peer (by peerID sort order) becomes coordinator
-   - Coordinator dials all members
-   - Members accept and form full mesh
+2. **Invitation**:
+   - The initiator generates a deterministic `roomID` (`uuid_v4()`).
+   - Initiator dials all members via `/isc/chat/1.0` and sends a `GroupInvite` message.
 
-3. Group Maintenance:
-   - Heartbeat every 30 seconds
-   - If member drops below 0.55 similarity, graceful exit prompt
-   - If coordinator leaves, new coordinator elected (lowest peerID)
+3. **Mesh Formation**:
+   - Members receive the invite, announce their membership to the DHT at `/isc/group/<roomID>`, and dial all other listed members to form a full mesh.
+
+4. **Group Maintenance**:
+   - Heartbeat every 30 seconds.
+   - If a member drifts and their pairwise similarities with the group drop below 0.55, they receive a graceful exit prompt.
+   - If the initiator leaves, the next highest `peerID` becomes the nominal state coordinator.
 
 ```typescript
+interface GroupInvite {
+  type: 'group_invite';
+  roomID: string;     // UUID
+  members: string[];  // peerIDs of all invited participants
+  timestamp: number;
+  signature: Uint8Array; // Signed by initiator
+}
+
 interface GroupRoom {
   roomID: string;
-  channelID: string;
-  centroid: number[];
   members: string[];  // peerIDs
   createdAt: number;
 }

@@ -232,7 +232,7 @@ Clients silently filter candidates with unsupported models. The network self-par
 | **P2P network** | `js-libp2p` (WebSockets + WebRTC, Noise, Yamux) |
 | **DHT** | `@libp2p/kad-dht` |
 | **ANN index** | `usearch` (WASM HNSW) |
-| **Crypto** | Web Crypto API (ed25519) for signing, `libsodium-wrappers` for encryption |
+| **Crypto** | Web Crypto API (ed25519) for signing, `libsodium-wrappers` for encryption (via `x25519` conversion) |
 | **Storage** | localStorage + IndexedDB |
 | **UI** | Vanilla HTML/JS (no framework dependencies) |
 

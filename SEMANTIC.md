@@ -104,24 +104,43 @@ async function computeRelationalDistributions(channel: Channel): Promise<Distrib
 
 ## Relational Matching
 
-Matching uses bipartite alignment across the multi-vector hypergraph:
+Matching uses bipartite alignment across the multi-vector hypergraph, evaluating the expected cosine similarity over Monte Carlo samples to account for distribution spread (σ):
 
 ```javascript
 function relationalMatch(myDists: Distribution[], peerDists: Distribution[]): number {
   let score = 0;
   let totalWeight = 0;
 
+  // Draw samples for distribution comparison
+  const nSamples = TIER_SAMPLES[getTier()];
+
   // 1. Root alignment
-  score += cosineSimilarity(myDists[0].mu, peerDists[0].mu);
+  const myRootSamples = sampleFromDistribution(myDists[0].mu, myDists[0].sigma, nSamples);
+  const peerRootSamples = sampleFromDistribution(peerDists[0].mu, peerDists[0].sigma, nSamples);
+
+  let rootScore = 0;
+  for (let s = 0; s < nSamples; s++) {
+    rootScore += cosineSimilarity(myRootSamples[s], peerRootSamples[s]);
+  }
+  score += (rootScore / nSamples);
   totalWeight += 1;
 
   // 2. Fused alignments — best-match bipartite pairing
   for (let i = 1; i < myDists.length; i++) {
     let best = 0;
+    const myFusedSamples = sampleFromDistribution(myDists[i].mu, myDists[i].sigma, nSamples);
+
     for (let j = 1; j < peerDists.length; j++) {
-      const sim = cosineSimilarity(myDists[i].mu, peerDists[j].mu)
-                  * (myDists[i].tag === peerDists[j].tag ? 1.2 : 1.0);
-      best = Math.max(best, sim);
+      const peerFusedSamples = sampleFromDistribution(peerDists[j].mu, peerDists[j].sigma, nSamples);
+
+      let sampleSim = 0;
+      for (let s = 0; s < nSamples; s++) {
+         sampleSim += cosineSimilarity(myFusedSamples[s], peerFusedSamples[s]);
+      }
+      sampleSim /= nSamples;
+
+      const adjustedSim = sampleSim * (myDists[i].tag === peerDists[j].tag ? 1.2 : 1.0);
+      best = Math.max(best, adjustedSim);
     }
     
     // Spatiotemporal domain boost
@@ -129,8 +148,8 @@ function relationalMatch(myDists: Distribution[], peerDists: Distribution[]): nu
       best += spatiotemporalSimilarity(myDists[i].tag, myDists[i], peerDists) * 0.5;
     }
     
-    score += best * myDists[i].weight;
-    totalWeight += myDists[i].weight;
+    score += best * (myDists[i].weight ?? 1.0);
+    totalWeight += (myDists[i].weight ?? 1.0);
   }
 
   return score / totalWeight;  // > 0.75 = match
@@ -351,34 +370,29 @@ function cosineSimilarity(a: number[], b: number[]): number {
 
 ## ANN (Approximate Nearest Neighbor) Index
 
-### HNSW via usearch (High/Mid Tier)
+### HNSW via usearch (High Tier / Supernodes)
+
+High-tier peers and Supernodes maintain a persistent, continuously-updated HNSW index of the global network state observed via the DHT. This allows them to perform extremely fast, broad queries for themselves and delegating peers.
 
 ```javascript
 import { Index } from 'usearch-wasm';
 
-async function buildHNSWIndex(vectors: number[][]): Promise<Index> {
-  const index = await Index({
-    metric: 'cos',
-    ndim: 384,
-    connectivity: 16,
-    expansionAdd: 200,
-    expansionSearch: 50,
-  });
-  
-  for (let i = 0; i < vectors.length; i++) {
-    index.add(i, vectors[i]);
-  }
-  
-  return index;
-}
+// Initialized at startup and persisted/updated as DHT announcements arrive
+const globalHNSWIndex = await Index({
+  metric: 'cos',
+  ndim: 384,
+  connectivity: 16,
+  expansionAdd: 200,
+  expansionSearch: 50,
+});
 
-async function queryIndex(index: Index, query: number[], k: number): Promise<number[]> {
-  const results = index.search(query, k);
+async function queryIndex(query: number[], k: number): Promise<number[]> {
+  const results = globalHNSWIndex.search(query, k);
   return results.map(r => r.key);
 }
 ```
 
-### Linear Scan (Low/Minimal Tier)
+### Linear Scan (Mid/Low/Minimal Tier)
 
 ```javascript
 function linearScan(candidates: PeerInfo[], query: number[], k: number): number[] {
