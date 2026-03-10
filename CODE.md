@@ -55,6 +55,7 @@ isc/
 **Purpose**: Pure JavaScript/TypeScript logic with zero environment dependencies.
 
 **Exports**:
+
 ```typescript
 // Embedding & semantic matching
 export function computeRelationalDistributions(channel: Channel): Distribution[];
@@ -78,7 +79,9 @@ export type { Channel, Distribution, Relation, Keypair };
 
 **Dependencies**: None (pure JS/TS only)
 
-**Testable**: 100% unit testable in Node.js, browser, or any JS environment.
+**Testable**: Core logic (embedding math, LSH, matching, crypto abstraction) testable in Node.js.
+**Requires Mocks**: Web Crypto API (use Node.js crypto module), IndexedDB (use LevelDB adapter).
+**Test Coverage Goal**: 90% for @isc/core, 70% for @isc/protocol.
 
 ---
 
@@ -87,6 +90,7 @@ export type { Channel, Distribution, Relation, Keypair };
 **Purpose**: Provide concrete implementations of abstract interfaces for different environments.
 
 **Structure**:
+
 ```
 adapters/
 ├── src/
@@ -193,6 +197,7 @@ export const nodeTierDetector: TierDetector = {
 **Purpose**: Define protocol handlers, message formats, and stream handlers.
 
 **Exports**:
+
 ```typescript
 // Protocol constants
 export const PROTOCOL_CHAT = '/isc/chat/1.0';
@@ -363,22 +368,36 @@ program.command('embed <text>').action(async (text) => {
 ## Migration Strategy
 
 ### Phase 1: Extract Core
+
 1. Move pure functions to `packages/core/`
 2. Remove all browser/Node.js imports from core
-3. Add comprehensive unit tests
+3. Add comprehensive unit tests (run in Node.js CI)
 
 ### Phase 2: Create Adapters
+
 1. Define interfaces in `adapters/src/interfaces/`
 2. Move browser-specific code to `adapters/src/browser/`
 3. Create Node.js implementations in `adapters/src/node/`
+4. Update browser app to import from adapters
 
 ### Phase 3: Extract Protocol
+
 1. Move libp2p protocol handlers to `packages/protocol/`
 2. Define message types and handlers
+3. Update both browser and Node.js apps to use protocol package
 
-### Phase 4: Create Apps
-1. Compose `@isc/apps/node` for supernode server
-2. Compose `@isc/apps/cli` for embedding utilities
+### Phase 4: Create Node.js Server
+
+1. Compose `@isc/apps/node` from core + adapters + protocol
+2. Add HTTP API for monitoring
+3. Add Prometheus metrics export
+4. Deploy as supernode reference implementation
+
+### Phase 5: CLI Tool
+
+1. Compose `@isc/apps/cli` for embedding/matching utilities
+2. Add to npm for community use
+3. Use in CI for ground-truth fixture generation
 
 ---
 
@@ -397,6 +416,7 @@ program.command('embed <text>').action(async (text) => {
 ## Example: Same Logic, Different Environments
 
 ### Browser
+
 ```typescript
 import { computeRelationalDistributions } from '@isc/core';
 import { browserModel } from '@isc/adapters/browser';
@@ -406,6 +426,7 @@ const dists = await computeRelationalDistributions(channel);
 ```
 
 ### Node.js Server
+
 ```typescript
 import { computeRelationalDistributions } from '@isc/core';
 import { nodeModel } from '@isc/adapters/node';
@@ -414,4 +435,26 @@ await nodeModel.load('Xenova/all-MiniLM-L6-v2');
 const dists = await computeRelationalDistributions(channel);
 ```
 
+### CLI
+
+```typescript
+import { computeRelationalDistributions } from '@isc/core';
+import { cliModel } from '@isc/adapters/cli';
+
+await cliModel.load('Xenova/all-MiniLM-L6-v2');
+const dists = await computeRelationalDistributions(channel);
+```
+
 **Same core function, different model adapters, identical results.**
+
+---
+
+## Future Form Factors
+
+| Form Factor | Adapter Needed | Effort |
+|-------------|----------------|--------|
+| **Desktop (Electron)** | Electron storage + model | Low (reuse Node.js) |
+| **iOS/Android (Native)** | Swift/Kotlin core bindings | High (FFI layer) |
+| **Edge (Cloudflare Workers)** | KV storage + edge model | Medium (WASM model) |
+| **Browser Extension** | Extension storage + model | Low (reuse browser) |
+| **Discord/Slack Bot** | Discord/Slack network adapter | Medium (protocol bridge) |

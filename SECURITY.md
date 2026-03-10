@@ -69,9 +69,11 @@ All social-layer content carries signatures. See [SOCIAL.md](SOCIAL.md#post-sche
 
 ### Deployment Modes
 
-ISC supports two deployment modes with different safety assumptions. See [README.md](README.md#deployment-modes) for the complete specification.
+ISC supports three deployment modes with different safety assumptions. See [README.md](README.md#deployment-modes) for the complete specification.
 
 **Trusted Network (Phase 1):** Pre-existing social trust, rate limiting + mute/block + semantic filters
+
+**Federated Networks (Phase 2):** Interconnected communities; reputation bridges
 
 **Public Network (Phase 2+):** Open participation, reputation weighting + stake signaling + coherence checks + decentralized moderation
 
@@ -81,9 +83,7 @@ ISC supports two deployment modes with different safety assumptions. See [README
 
 ### Rate Limiting
 
-Rate limits prevent spam and abuse. See [PROTOCOL.md](PROTOCOL.md#rate-limits) for the complete specification.
-
-**Key limits:** DHT Announce: 5/min, Chat Dial: 20/hr, DHT Query: 30/min
+Rate limits prevent spam and abuse. See [PROTOCOL.md](PROTOCOL.md#rate-limits) for the complete specification of layered bounds on DHT activity and WebRTC connections.
 
 ### Mute / Block Lists
 
@@ -114,9 +114,45 @@ See [SOCIAL.md](SOCIAL.md#web-of-trust) for the `ReputationScore` interface.
 Peers accumulate reputation via successful interactions. Low-rep announcements deprioritized in ANN results. Reputation decays with 30-day half-life.
 
 **Sybil resistance**:
+
 - Mutual signing requirement (both parties confirm interaction)
 - Time-weighted decay
 - 7-day bootstrapping period for new peers
+
+### Reputation Score Calculation
+
+**Formula**:
+
+```
+R(t) = R₀ × e^(-λt) + Σ(interaction_delta × e^(-λ(t - t_interaction)))
+
+Where:
+- R(t) = reputation at time t
+- R₀ = initial reputation (0.5 for new peers)
+- λ = ln(2) / 30 days = 0.0231 per day (decay constant)
+- t = time since last activity (days)
+- interaction_delta = +0.1 for successful interaction, -0.2 for flagged interaction
+```
+
+**Implementation**:
+
+```javascript
+function calculateReputation(interactions: Interaction[], now: number): number {
+  const lambda = Math.log(2) / 30;  // 30-day half-life
+  const baseReputation = 0.5;
+
+  let reputation = baseReputation;
+  for (const interaction of interactions) {
+    const ageDays = (now - interaction.timestamp) / (1000 * 60 * 60 * 24);
+    const delta = interaction.successful ? 0.1 : -0.2;
+    reputation += delta * Math.exp(-lambda * ageDays);
+  }
+
+  return Math.max(0, Math.min(1, reputation));  // Clamp to [0, 1]
+}
+```
+
+**Decay Calculation**: Run every 24 hours for all active peers.
 
 ### Stake-Based Signaling (Opt-In)
 
@@ -156,6 +192,7 @@ Signed reports stored in DHT. Clients weight reports by reporter reputation. No 
 | **Vector-only announcements** | Only vectors + peerID announced publicly |
 | **Raw text never broadcast** | Unless user explicitly posts |
 | **E2E encrypted chats** | WebRTC DTLS + Noise protocol |
+| **Sealed Box Encryption** | Libsodium `crypto_box_seal` (requires converting Web Crypto `ed25519` keys to `x25519` using `crypto_sign_ed25519_pk_to_curve25519`) |
 
 ### Enhanced Capabilities
 
@@ -201,6 +238,35 @@ async function deleteAllData(): Promise<void> {
 }
 ```
 
+### Key Backup & Recovery
+
+**Social Recovery (Shamir's Secret Sharing)**:
+
+1. Split private key into N shards (threshold K required)
+2. Distribute shards to trusted peers
+3. Recovery: Collect K shards, reconstruct key
+4. Parameters: N=5, K=3 (any 3 of 5 friends can recover)
+
+**Encrypted Cloud Backup**:
+
+1. Encrypt private key with user passphrase (PBKDF2, 100k iterations)
+2. Upload to user's cloud storage (iCloud, Google Drive, Dropbox)
+3. Recovery: Download, decrypt with passphrase
+
+**Hardware Key Support**:
+
+1. Store private key on YubiKey / hardware wallet
+2. Sign operations via hardware key API
+3. Key never leaves hardware device
+
+**Key Rotation**:
+
+1. Generate new keypair
+2. Re-encrypt all stored data with new key
+3. Re-sign all announcements with new key
+4. Announce key rotation to DHT (signed by old key)
+5. Grace period: 30 days (both keys accepted)
+
 #### Delegation Privacy
 
 | Guarantee | Implementation |
@@ -212,6 +278,36 @@ async function deleteAllData(): Promise<void> {
 | **Future: ZK proofs** | Verification without revealing inputs |
 
 ---
+
+## Analytics & Monitoring
+
+**Optional Telemetry** (opt-in, privacy-preserving):
+
+- Metrics: Time-to-first-match, connection success rate, delegation latency
+- Aggregation: Daily aggregates, no individual tracking
+- Anonymization: Differential privacy (ε=1.0)
+- Export: Public dashboard (metrics.isc.network)
+
+**Performance Metrics** (local, always-on):
+
+- Model load time
+- DHT query latency
+- Match quality (similarity distribution)
+- Available in DevTools Console
+
+**Error Reporting** (opt-in):
+
+- Stack traces (no PII)
+- Context: Browser version, device tier, network state
+- Aggregation: Frequency analysis, no individual tracking
+- Export: GitHub Issues auto-filing for critical errors
+
+**Privacy Guarantees**:
+
+- No raw text or vectors transmitted
+- No peer IDs in telemetry (hashed with daily salt)
+- User can export/delete telemetry data
+- User can disable telemetry at any time
 
 ## Threat Model
 

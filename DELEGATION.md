@@ -64,6 +64,7 @@ Supernodes broadcast signed `delegate_capability` announcements to DHT:
 ```
 
 **Services**:
+
 - `embed`: Compute embeddings for text
 - `ann_query`: Run approximate nearest neighbor queries
 - `sig_verify`: Verify signatures on behalf of low-tier peers
@@ -89,16 +90,22 @@ interface DelegateRequest {
 ```
 
 **Request encryption**:
+
 ```javascript
-import { seal } from 'libsodium-wrappers';
+import sodium from 'libsodium-wrappers';
 
 async function encryptForSupernode(
   plaintext: Uint8Array,
-  supernodePubKey: Uint8Array
+  supernodeEd25519PubKey: Uint8Array
 ): Promise<Uint8Array> {
-  return seal(plaintext, supernodePubKey);
+  await sodium.ready;
+  // Convert ed25519 signing key to x25519 encryption key
+  const x25519PubKey = sodium.crypto_sign_ed25519_pk_to_curve25519(supernodeEd25519PubKey);
+  return sodium.crypto_box_seal(plaintext, x25519PubKey);
 }
 ```
+
+*Note: Signatures use Web Crypto API (ed25519), while encryption uses libsodium-wrappers (sealed boxes). The ed25519 public key must be converted to x25519 before encryption.*
 
 ### 2. Verifiable Response
 
@@ -125,7 +132,7 @@ interface DelegateResponse {
 
 Requesting peer verifies:
 
-1. **Signature check**: Supernode signature matches advertised public key
+1. **Signature check**: Supernode signature matches advertised public key (via Web Crypto API)
 2. **Embedding norm**: ‖embedding‖ ≈ 1.0 (±0.01 tolerance)
 3. **Model version**: Matches expected canonical model
 4. **Request ID**: Matches original request
@@ -241,13 +248,13 @@ async function handleEmbedRequest(req: EmbedRequest): Promise<EmbedResponse> {
 
 ### ANN Query Service
 
-Run approximate nearest neighbor search:
+Run approximate nearest neighbor search over the supernode's persistent, globally-updated HNSW index:
 
 ```typescript
 interface ANNQueryRequest {
   query: number[];
-  candidates: PeerInfo[];
   k: number;
+  modelHash: string; // Ensure namespace isolation
 }
 
 interface ANNQueryResponse {
@@ -255,15 +262,19 @@ interface ANNQueryResponse {
   scores: number[];
 }
 
+// Supernodes continuously map DHT announcements into their local `globalHNSWIndex`
 async function handleANNQueryRequest(req: ANNQueryRequest): Promise<ANNQueryResponse> {
-  const index = await buildHNSWIndex(req.candidates.map(c => c.vec));
-  const results = await queryIndex(index, req.query, req.k);
+  // Query against the supernode's pre-built view of the network
+  const index = globalHNSWIndex.get(req.modelHash);
+  const resultIndices = await queryIndex(index, req.query, req.k);
+
+  const matches = resultIndices.map(i => index.getPeerInfo(i));
   
   return {
-    matches: results.map(i => req.candidates[i]),
-    scores: results.map(i => relationalMatch(
+    matches,
+    scores: matches.map(peer => relationalMatch(
       [{ type: 'root', mu: req.query, sigma: 0.1 }],
-      [{ type: 'root', mu: req.candidates[i].vec, sigma: 0.1 }]
+      [{ type: 'root', mu: peer.vec, sigma: 0.1 }]
     )),
   };
 }
@@ -353,6 +364,7 @@ Supernodes announce a `delegation_health` signal every 5 minutes:
 ```
 
 **Metrics**:
+
 - `successRate`: Fraction of requests completed successfully (target: >0.95)
 - `avgLatencyMs`: Average response latency (target: <500ms)
 - `requestsServed24h`: Total requests served in last 24 hours
@@ -416,6 +428,7 @@ async function delegateWithFallback(request: DelegateRequest): Promise<DelegateR
 ### Setup
 
 1. **Start a supernode**:
+
    ```bash
    npx serve . --port 8080
    # Open http://localhost:8080?tier=high&supernode=true
@@ -423,6 +436,7 @@ async function delegateWithFallback(request: DelegateRequest): Promise<DelegateR
    ```
 
 2. **Start a low-tier client**:
+
    ```bash
    npx serve . --port 8081
    # Open http://localhost:8081?tier=low&delegate=true
