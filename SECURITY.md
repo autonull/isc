@@ -27,23 +27,32 @@ The design is inspired by **Nostr** (cryptographic authenticity, censorship resi
 - **Authenticated announcements**: All DHT announcements signed with private key
 - **Encrypted streams**: WebRTC DTLS secures all chat communications
 
-### User Keypairs
+### User Keypairs (Dual-Key System)
 
-On first launch:
+To avoid unsafe key conversions between signing and encryption formats, ISC generates separate, dedicated keypairs natively via the Web Crypto API on first launch:
 
 ```javascript
-import { generateKeypair } from '@isc/core';
+import { generateSigningKeypair, generateEncryptionKeypair } from '@isc/core';
 
-// Generate ed25519 keypair via Web Crypto API
-const keypair = await generateKeypair();
+// Generate ed25519 for identity and signing
+const signingKeys = await generateSigningKeypair();
 
-// Public key = user's persistent "ISC identity" (like Nostr's npub)
-const userID = await toBase58(keypair.publicKey);
+// Generate ECDH (P-256 or X25519) for E2E encryption and sealed boxes
+const encryptionKeys = await generateEncryptionKeypair();
 
-// Private key stored in IndexedDB, optionally encrypted with passphrase
-await storage.set('keypair', {
-  publicKey: keypair.publicKey,
-  privateKey: await encryptPrivateKey(keypair.privateKey, passphrase),
+// Public signing key = user's persistent "ISC identity"
+const userID = await toBase58(signingKeys.publicKey);
+
+// Keys stored in IndexedDB, optionally encrypted with passphrase
+await storage.set('keypairs', {
+  signing: {
+    publicKey: signingKeys.publicKey,
+    privateKey: await encryptPrivateKey(signingKeys.privateKey, passphrase),
+  },
+  encryption: {
+    publicKey: encryptionKeys.publicKey,
+    privateKey: await encryptPrivateKey(encryptionKeys.privateKey, passphrase),
+  }
 });
 ```
 
@@ -115,6 +124,7 @@ Peers accumulate reputation via successful interactions. Low-rep announcements d
 
 **Sybil resistance**:
 
+- **Proof-of-Work (Hashcash)**: Generating DHT announcements requires a computational proof (e.g., finding a SHA-256 hash with 16 leading zero bits). This adds a small cost (~1-2 seconds) for legitimate users but makes flooding the DHT prohibitively expensive for attackers.
 - Mutual signing requirement (both parties confirm interaction)
 - Time-weighted decay
 - 7-day bootstrapping period for new peers
@@ -192,7 +202,7 @@ Signed reports stored in DHT. Clients weight reports by reporter reputation. No 
 | **Vector-only announcements** | Only vectors + peerID announced publicly |
 | **Raw text never broadcast** | Unless user explicitly posts |
 | **E2E encrypted chats** | WebRTC DTLS + Noise protocol |
-| **Sealed Box Encryption** | Libsodium `crypto_box_seal` (requires converting Web Crypto `ed25519` keys to `x25519` using `crypto_sign_ed25519_pk_to_curve25519`) |
+| **Sealed Box Encryption** | Native Web Crypto API (ECDH) |
 
 ### Enhanced Capabilities
 
@@ -274,7 +284,8 @@ async function deleteAllData(): Promise<void> {
 | **Request encryption** | Encrypted with supernode's public key |
 | **Minimal exposure** | Only channel descriptions delegated (never chat messages) |
 | **Per-channel control** | Users can disable delegation via Settings |
-| **No logging policy** | Supernodes expected to discard request contents after computation |
+| **No logging policy** | **Warning: High Privacy Risk.** Supernodes *must* decrypt the text to compute the embedding. The system currently relies on an honor system where supernodes promise to discard the text after computation. |
+| **Future: TEEs** | Trusted Execution Environments (e.g., AWS Nitro Enclaves) to cryptographically attest that the supernode cannot read the inputs it processes. |
 | **Future: ZK proofs** | Verification without revealing inputs |
 
 ---

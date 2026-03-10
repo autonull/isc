@@ -2,9 +2,9 @@
 
 > **Meet your thought neighbors.**
 
-A fully decentralized, browser-only social platform that uses in-browser LLM embeddings to place ideas in a shared vector space — then serendipitously connects you with peers whose mental distributions are closest to yours.
+A hybrid decentralized social platform that uses in-browser LLM embeddings to place ideas in a shared vector space — then serendipitously connects you with peers whose mental distributions are closest to yours. Designed to run natively in the browser, supported by a network of community supernodes and relays to ensure reliability despite browser backgrounding and NAT constraints.
 
-**Minimal servers. No accounts. No surveillance. Just thought and conversation.**
+**Community infra. No accounts. No surveillance. Just thought and conversation.**
 
 ---
 
@@ -25,8 +25,8 @@ See [PROTOCOL.md](PROTOCOL.md) for complete protocol specification.
 
 | Property | Description |
 |---|---|
-| **Fully browser-native** | Minimal server-side compute; all embedding and routing runs in-browser |
-| **Serverless P2P** | Kademlia DHT for discovery, WebRTC DataChannels for chat |
+| **Hybrid browser-native** | All personal embedding and chat logic runs locally in-browser; relies on community supernodes for routing and background reliability |
+| **Serverless P2P** | Kademlia DHT for discovery, Global PubSub firehose for index building, WebRTC DataChannels for chat |
 | **Channels** | Multiple named presence contexts with optional relational semantics |
 | **Adaptive by device** | Model size, worker concurrency, and matching depth auto-scale to device capability |
 | **Fuzzy identity** | Users represented as distributions in embedding space, not fixed points |
@@ -232,7 +232,7 @@ Clients silently filter candidates with unsupported models. The network self-par
 | **P2P network** | `js-libp2p` (WebSockets + WebRTC, Noise, Yamux) |
 | **DHT** | `@libp2p/kad-dht` |
 | **ANN index** | `usearch` (WASM HNSW) |
-| **Crypto** | Web Crypto API (ed25519) for signing, `libsodium-wrappers` for encryption (via `x25519` conversion) |
+| **Crypto** | Native Web Crypto API: Ed25519 for signing, ECDH/AES-GCM for E2E encryption |
 | **Storage** | localStorage + IndexedDB |
 | **UI** | Vanilla HTML/JS (no framework dependencies) |
 

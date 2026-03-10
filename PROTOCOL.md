@@ -197,6 +197,8 @@ function lshHash(vec: number[], seed: string, numHashes: number = 20, hashLen: n
 
 ### Announcement Payload
 
+To mitigate Sybil attacks on the permissionless DHT, announcements require a Proof-of-Work (Hashcash) computation.
+
 ```typescript
 interface SignedAnnouncement {
   peerID: string;           // libp2p peer ID (base58btc)
@@ -206,6 +208,7 @@ interface SignedAnnouncement {
   relTag?: string;          // optional relation tag for fused distributions
   ttl: number;              // seconds until expiry (default 300)
   updatedAt: number;        // Unix timestamp (ms)
+  nonce: number;            // Proof-of-Work nonce
   signature: Uint8Array;    // ed25519 signature
 }
 ```
@@ -237,6 +240,14 @@ async function announceChannel(channel: Channel, dists: Distribution[], modelHas
 ### Query Protocol
 
 ```javascript
+// Perform Proof-of-Work check
+function verifyPoW(announcement: SignedAnnouncement, targetZeros: number = 16): boolean {
+  const data = encode({...announcement, signature: new Uint8Array(0)});
+  const hash = sha256(data);
+  // Check if first targetZeros bits are 0
+  return countLeadingZeros(hash) >= targetZeros;
+}
+
 async function queryProximals(sample: number[], modelHash: string): Promise<PeerInfo[]> {
   const seen = new Set<string>();
   const candidates: PeerInfo[] = [];
@@ -294,23 +305,46 @@ async function handleChatStream(stream: Stream) {
 }
 ```
 
-### Dial Protocol
+### WebRTC Signaling & Dial Protocol
+
+Because WebRTC requires SDP offer/answer exchange before connecting, peers use a dedicated Libp2p PubSub topic (`/isc/signal/<peerID>`) for signaling, relying on community relays/supernodes for message routing.
+
+```typescript
+interface SignalMessage {
+  type: 'offer' | 'answer' | 'candidate';
+  senderID: string;
+  payload: string; // SDP or ICE candidate
+  signature: Uint8Array;
+}
+```
 
 ```javascript
 async function initiateChat(peerID: string, channel: Channel): Promise<Stream> {
+  // SDP exchange happens out-of-band via PubSub:
+  // node.pubsub.publish(`/isc/signal/${peerID}`, encode(offerSignal))
+
   const stream = await node.dialProtocol(peerID, PROTOCOL_CHAT);
   
   const greeting: ChatMessage = {
     channelID: channel.id,
     msg: 'Hey, our thoughts are proximal!',
     timestamp: Date.now(),
-    signature: await sign(encode(greeting), keypair.privateKey),
+    signature: await sign(encode(greeting), signingKeys.privateKey),
   };
   
   await stream.sink(encode(greeting));
   return stream;
 }
 ```
+
+### Global PubSub Firehose
+
+Instead of supernodes passively crawling the DHT (which violates Kademlia routing rules), all announcements are dual-published:
+
+1. Pushed to the target LSH keys in the DHT (for low-tier peer lookups).
+2. Broadcast to a global PubSub topic: `/isc/firehose/v1`.
+
+Supernodes subscribe to this firehose to continuously build and update their global HNSW indexes efficiently.
 
 ### Group Chat Formation
 

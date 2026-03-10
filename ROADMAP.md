@@ -25,7 +25,7 @@ ISC is being developed in phases, starting with core reliability in trusted netw
 | MVP — single-channel semantic matching + 1:1 WebRTC chat | 🔲 | P0 |
 | Basic multi-channel UI — create, switch, manage multiple channels | 🔲 | P0 |
 | Supernode delegation protocol + capability advertisement | 🔲 | P0 |
-| Layered anti-spam (rate limits only) | 🔲 | P0 |
+| Layered anti-spam (rate limits + Hashcash PoW) | 🔲 | P0 |
 | Model version negotiation + compatibility shards | 🔲 | P1 |
 | Device tier auto-detection + delegate mode UI | 🔲 | P1 |
 | Threat model validation + security audit (community) | 🔲 | P1 |
