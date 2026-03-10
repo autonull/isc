@@ -376,13 +376,31 @@ To avoid false negatives (missing similar vectors) while keeping the number of L
 Instead of querying only the exact matching LSH bucket, clients probe the target bucket and its nearest neighboring buckets (buckets with a Hamming distance of 1 from the target hash). This dramatically increases recall (from ~40% to >85%) while allowing `numHashes` to be reduced, minimizing DHT amplification.
 
 ```javascript
-function multiProbeQuery(candidates: PeerInfo[], query: number[], k: number): number[] {
-  // Candidates arrived from probing the primary bucket + 1-bit perturbed neighboring buckets
-  const scored = candidates.map(peer => ({
+async function multiProbeQuery(queryVec: number[], numBaseHashes: number, k: number): Promise<PeerInfo[]> {
+  const targetHashes = lshHash(queryVec, modelHash, numBaseHashes, 32, true); // true = enableMultiProbe (generates 1-bit flips)
+
+  const uniqueCandidates = new Map<string, PeerInfo>();
+
+  // 1. Traverse DHT for exact buckets and 1-bit neighbor buckets
+  for (const bucketHash of targetHashes) {
+    const rawPeers = await node.contentRouting.getMany(bucketHash, { count: TIER.candidateCap });
+
+    // 2. Deduplication: The same peer might announce to multiple overlapping buckets
+    for (const raw of rawPeers) {
+      const peer: PeerInfo = JSON.parse(raw);
+      if (!uniqueCandidates.has(peer.peerID)) {
+        uniqueCandidates.set(peer.peerID, peer);
+      }
+    }
+  }
+
+  // 3. Local Refinement: Score all discovered candidates using Analytical Approximation
+  const scored = Array.from(uniqueCandidates.values()).map(peer => ({
     peer,
-    score: expectedCosineSimilarity(query, 0.1, peer.vec, 0.1), // Assumed nominal spread
+    score: expectedCosineSimilarity(queryVec, 0.1, peer.vec, peer.spread || 0.1),
   }));
   
+  // 4. Rank and return top-K matches
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, k).map(s => s.peer);
 }

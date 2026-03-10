@@ -317,12 +317,38 @@ To solve the "Browser Backgrounding" problem (where mobile OSs kill WebSockets),
 
 When a message arrives for a sleeping peer, the Mailbox relay triggers a standard **Web Push Notification** to wake the client's Service Worker, which retrieves the buffered messages, decrypts them, and establishes the WebRTC connection in the background.
 
+#### Mailbox Protocol Schemas (`/isc/mailbox/1.0`)
+
+When a peer sends an offline message, they wrap the standard `SignalMessage` in an ECIES-encrypted envelope targeted at the recipient's public key, then deliver it to the recipient's registered relay:
+
+```typescript
+interface MailboxEnvelope {
+  recipientID: string;
+  ephemeralPubKey: Uint8Array;  // Sender's ephemeral ECDH key
+  encryptedPayload: Uint8Array; // AES-GCM encrypted SignalMessage
+  iv: Uint8Array;               // Initialization vector
+  ttl: number;                  // Expiry timestamp (ms)
+}
+```
+
+The relay stores the `MailboxEnvelope` and immediately fires a Web Push Notification to the recipient. To prevent metadata leakage through the push service (e.g., Apple APNs or Google FCM), the push payload contains *no identifiable content*—only a wake-up trigger:
+
+```json
+{
+  "topic": "isc.wakeup",
+  "relayUrl": "wss://relay1.isc.network",
+  "msgCount": 1
+}
+```
+
+Upon waking, the Service Worker connects to the `relayUrl`, fetches pending `MailboxEnvelope`s, derives the shared secret via ECDH using the sender's `ephemeralPubKey` and the recipient's private key, decrypts the `SignalMessage`, and establishes the WebRTC DataChannel.
+
 ```typescript
 interface SignalMessage {
   type: 'offer' | 'answer' | 'candidate';
   senderID: string;
   payload: string; // SDP or ICE candidate
-  signature: Uint8Array;
+  signature: Uint8Array; // Ed25519 signature of the payload
 }
 ```
 
