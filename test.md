@@ -52,15 +52,16 @@ Layers 0–2 ship in Phase 1. Layers 3–5 grow progressively through Phases 2�
 
 ---
 
-## Rate Limit Hierarchy
+## Rate Limits
 
-| Rate Limit Type | Scope | Limit | Enforcement Point |
-|-----------------|-------|-------|-------------------|
-| DHT Announce | per peer / min | 5 | Local client + supernode |
-| Delegation Request | per peer / min | 3 | Supernode |
-| Delegation Response | per supernode concurrent | 10 | Supernode |
-| Chat Dial | per peer / hr | 20 | Local client |
-| DHT Query | per peer / min | 30 | Bootstrap relay |
+See [PROTOCOL.md](PROTOCOL.md#rate-limits) for the complete rate limit specification.
+
+Test verification:
+- DHT Announce: 5/min per peer
+- Delegation Request: 3/min per peer
+- Delegation Response: 10 concurrent per supernode
+- Chat Dial: 20/hr per peer
+- DHT Query: 30/min per peer
 
 ---
 
