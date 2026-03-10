@@ -8,12 +8,12 @@
   to save battery and memory. A "browser-only P2P" network relying on
   persistent DHT participation and WebRTC connections will face severe churn
   when users switch tabs or minimize the browser.
-- **Impact**: DHT announcements will drop, and connections will be severed
-  prematurely, breaking the continuous "P2P network" assumption. The "Seed Tab"
-  pattern is a workaround, but requires active user management. Mobile browsers
-  (iOS Safari, Android Chrome) kill background WebRTC streams and WebSocket
-  connections even faster than desktop browsers, making a mobile-first P2P
-  network in the browser practically infeasible without a native app component.
+- **Resolution**: ISC shifts away from a "pure browser" assumption to a
+  **Hybrid Peer-to-Peer** architecture. Community-operated relays utilizing the
+  Mailbox Protocol (`/isc/mailbox/1.0`) act as reliable proxies for offline
+  or backgrounded peers. When Web Push Notifications trigger the Service Worker,
+  it processes buffered announcements and connection requests asynchronously.
+  This removes the requirement for users to keep tabs actively open.
 
 ### WebRTC Signaling and NAT Traversal
 
@@ -67,24 +67,24 @@
 - **Issue**: Cosine similarity is only meaningful within the exact same
   embedding space. The protocol includes `modelHash` in the DHT key to isolate
   spaces.
-- **Impact**: As models evolve or new ones are introduced, the network
-  splinters into isolated shards. Users on `v1` cannot discover users on `v2`.
-  The "90-day dual-announcement" mitigation requires clients to download and
-  run multiple LLMs simultaneously, violating the browser resource constraints
-  (especially for low/mid-tier devices).
+- **Resolution**: To prevent network splinters and avoid forcing constrained
+  clients to download multiple models simultaneously, ISC employs **Model
+  Bridging**. High-tier Supernodes automatically offer an `Embed & Translate`
+  service (`translate_embedding`), acting as cross-shard routers. They convert
+  embeddings from old to new canonical models for low-tier peers during the
+  transition period, keeping the network intact dynamically.
 
 ### Relational Matching and Monte Carlo Sampling
 
 - **Issue**: To handle "distribution fuzziness" (spread/sigma), the protocol
-  uses Monte Carlo sampling (e.g., 100 samples per match) to calculate expected
-  cosine similarity.
-- **Impact**: This is computationally extremely expensive to do for every
-  candidate peer discovered from the DHT. Doing `100 samples * 100 candidates =
-  10,000` cosine similarity calculations in JavaScript on every UI refresh will
-  block the main thread or heavily tax the Web Worker, draining battery. There
-  are closed-form analytical approximations for the expected cosine similarity
-  of two isotropic Gaussian distributions that would be orders of magnitude
-  faster.
+  initially proposed Monte Carlo sampling (e.g., 100 samples per match) to
+  calculate expected cosine similarity.
+- **Resolution**: This massive computational overhead was removed in favor of a
+  **closed-form analytical approximation** (`expectedCosineSimilarity`). By
+  analytically projecting isotropic Gaussians onto the unit hypersphere,
+  matching is performed in $O(1)$ time relative to the sample count. This reduces
+  computational complexity by a factor of 100x, allowing browsers to synchronously
+  evaluate hundreds of candidates without locking the main thread.
 
 ## 3. Security, Privacy & Trust Concerns
 
@@ -126,12 +126,13 @@
 ## Conclusion
 
 While the concept of an ephemeral, semantic-routing-based P2P chat network is
-innovative, the current ISC architecture relies on several contradictory
-assumptions. Browser lifecycle constraints fundamentally clash with the
-requirements of a stable DHT and persistent WebRTC routing. Furthermore, the
-math underpinning the global LSH routing and supernode global views requires
-significant revision to be practical at scale. Finally, the privacy guarantees
-are broken the moment a user relies on a Supernode for delegation. Addressing
-these issues will likely require moving away from a pure "browser-only" model
-toward a hybrid model with more robust, persistent (and potentially
-privacy-preserving) relay infrastructure.
+highly innovative, the initial iterations of the ISC architecture relied on
+several contradictory "pure-browser" assumptions. By systematically addressing
+these contradictions—migrating to a Hybrid P2P model with Mailbox relays for
+lifecycle stability, implementing Multi-Probe LSH and global PubSub firehoses
+for efficient DHT routing, replacing Monte Carlo math with analytical
+approximations, standardizing entirely on the native Web Crypto API, and tying
+Sybil resistance to Cryptographic Vouching—ISC has matured into a remarkably
+elegant and viable protocol. The deliberate trade-off of supernode decryption
+during delegation remains a documented limitation until TEEs arrive, but the
+core system is now architecturally robust and ready for scaled deployment.
