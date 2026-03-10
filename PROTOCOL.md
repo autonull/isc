@@ -255,30 +255,9 @@ interface GroupRoom {
 
 ## Delegation Protocol
 
-See [DELEGATION.md](DELEGATION.md) for the complete specification.
+See [DELEGATION.md](DELEGATION.md) for the complete specification including request encryption, verification, and trust mechanisms.
 
 **Protocol**: `/isc/delegate/1.0`
-
-```typescript
-interface DelegateRequest {
-  type: 'delegate_request';
-  requestID: string;
-  service: 'embed' | 'ann_query' | 'sig_verify';
-  payload: Uint8Array;  // encrypted
-  requesterPubKey: Uint8Array;
-  timestamp: number;
-  signature: Uint8Array;
-}
-
-interface DelegateResponse {
-  type: 'delegate_response';
-  requestID: string;
-  result: { embedding?: number[]; matches?: PeerInfo[]; valid?: boolean };
-  supernodePubKey: Uint8Array;
-  timestamp: number;
-  signature: Uint8Array;
-}
-```
 
 ---
 
