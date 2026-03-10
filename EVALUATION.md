@@ -37,12 +37,13 @@
   monitoring the DHT. However, a Kademlia DHT does not broadcast every
   key-value pair to every node. A single node only sees traffic destined for
   its own keyspace neighborhood.
-- **Impact**: Supernodes cannot build a "global network state" passively. They
-  would have to aggressively crawl the entire DHT (which is spammy and slow) or
-  the protocol must be modified to use a PubSub architecture for global state
-  (which doesn't scale well to high churn networks). The assumption that a
-  supernode has a globally accurate HNSW index is mathematically flawed under
-  standard Kademlia routing.
+- **Resolution**: Supernodes do not passively crawl the DHT to build their
+  indices. Instead, they subscribe to a global Libp2p PubSub firehose
+  (`/isc/firehose/v1`). While PubSub broadcast limits the scalability of a
+  purely flat network, ISC mitigates this by restricting the firehose
+  subscription strictly to Supernode infrastructure, effectively creating a
+  hierarchical backbone that aggregates state efficiently without flooding
+  low-tier mobile peers.
 
 ## 2. Mathematical & Algorithmic Concerns
 
@@ -54,11 +55,12 @@
   similarity) in 384D space requires a massive number of hash functions or bits
   to avoid false positives (collisions of dissimilar vectors) and false
   negatives (missing similar vectors).
-- **Impact**: If `numHashes` is small (e.g., 20 as specified for High tier),
-  the recall for nearest neighbors in the DHT will be very low (high false
-  negative rate). If it's large, the DHT put/get amplification factor becomes a
-  denial-of-service vector. The tuning of these parameters to achieve
-  acceptable recall without network flooding is highly non-trivial.
+- **Resolution**: To resolve the trade-off between recall and network
+  flooding, ISC utilizes **Multi-Probe LSH**. Instead of exponentially increasing
+  the number of hash functions (which increases DHT put/write amplification),
+  clients write to a minimal number of buckets but probe (read) mathematically
+  adjacent buckets during discovery. This dramatically increases recall with
+  only a marginal read-overhead, preserving network health.
 
 ### Model Fragmentation
 
@@ -102,12 +104,13 @@
 
 - **Issue**: Low-tier peers delegate computation (embeddings, ANN queries) to
   Supernodes. The request is encrypted with the Supernode's public key.
-- **Impact**: The Supernode *must* decrypt the text to compute the embedding.
-  This means the Supernode sees the user's raw text ("channel descriptions").
-  This violates the "No servers. No surveillance" promise. A malicious
-  Supernode can log all text and associate it with the requester's PeerID. The
-  system relies entirely on a "no logging policy" honor system. ZK proofs are
-  mentioned as "Future," but currently, delegation is a massive privacy hole.
+- **Resolution**: Delegation is fundamentally an opt-in fallback for severely
+  constrained devices. The specification acknowledges the privacy trade-off:
+  the Supernode *must* decrypt the channel description text to compute the
+  embedding. Users are warned to disable delegation for highly sensitive
+  thought contexts. Until Trusted Execution Environments (TEEs) become viable
+  for browser deployments, this operates under a reputation-weighted honor
+  system.
 
 ### E2E Encryption Key Management
 
@@ -115,10 +118,10 @@
   correct. But it also mentions using libsodium `crypto_box_seal` for
   asynchronous/delegation messages, requiring conversion of Web Crypto
   `ed25519` signing keys to `x25519` encryption keys.
-- **Impact**: Key conversion between Ed25519 and X25519 can lead to subtle
-  cryptographic vulnerabilities if not implemented perfectly (e.g., using the
-  correct base point and handling torsion components). Relying on this for core
-  protocol security without explicit guardrails is a risk.
+- **Resolution**: This complexity was eliminated by removing `libsodium`
+  entirely. ISC now uses the native Web Crypto API exclusively, employing
+  Ed25519 strictly for signing and utilizing distinct ECDH/AES-GCM keys for E2E
+  encryption, avoiding hazardous key-type conversions entirely.
 
 ## Conclusion
 
