@@ -64,6 +64,7 @@ Supernodes broadcast signed `delegate_capability` announcements to DHT:
 ```
 
 **Services**:
+
 - `embed`: Compute embeddings for text
 - `ann_query`: Run approximate nearest neighbor queries
 - `sig_verify`: Verify signatures on behalf of low-tier peers
@@ -89,6 +90,7 @@ interface DelegateRequest {
 ```
 
 **Request encryption**:
+
 ```javascript
 import { seal } from 'libsodium-wrappers';
 
@@ -99,6 +101,8 @@ async function encryptForSupernode(
   return seal(plaintext, supernodePubKey);
 }
 ```
+
+*Note: Signatures use Web Crypto API (ed25519), while encryption uses libsodium-wrappers (sealed boxes).*
 
 ### 2. Verifiable Response
 
@@ -125,7 +129,7 @@ interface DelegateResponse {
 
 Requesting peer verifies:
 
-1. **Signature check**: Supernode signature matches advertised public key
+1. **Signature check**: Supernode signature matches advertised public key (via Web Crypto API)
 2. **Embedding norm**: ‖embedding‖ ≈ 1.0 (±0.01 tolerance)
 3. **Model version**: Matches expected canonical model
 4. **Request ID**: Matches original request
@@ -353,6 +357,7 @@ Supernodes announce a `delegation_health` signal every 5 minutes:
 ```
 
 **Metrics**:
+
 - `successRate`: Fraction of requests completed successfully (target: >0.95)
 - `avgLatencyMs`: Average response latency (target: <500ms)
 - `requestsServed24h`: Total requests served in last 24 hours
@@ -416,6 +421,7 @@ async function delegateWithFallback(request: DelegateRequest): Promise<DelegateR
 ### Setup
 
 1. **Start a supernode**:
+
    ```bash
    npx serve . --port 8080
    # Open http://localhost:8080?tier=high&supernode=true
@@ -423,6 +429,7 @@ async function delegateWithFallback(request: DelegateRequest): Promise<DelegateR
    ```
 
 2. **Start a low-tier client**:
+
    ```bash
    npx serve . --port 8081
    # Open http://localhost:8081?tier=low&delegate=true

@@ -12,13 +12,13 @@
 
 Verify all content from original files was preserved during sharding:
 
-- [ ] Compare `archive/architecture.original.md` (648 lines) → `CODE.md` + `README.md`
-- [ ] Compare `archive/monorepo.original.md` (660 lines) → `CODE.md`
-- [ ] Compare `archive/semantic.md` (179 lines) → `SEMANTIC.md`
-- [ ] Compare `archive/social.md` (71 lines) → `SOCIAL.md`
-- [ ] Compare `archive/safety.md` (74 lines) → `SECURITY.md`
-- [ ] Compare `archive/channels.md` (42 lines) → `PROTOCOL.md`
-- [ ] Compare `archive/embeddings.md` (54 lines) → `SEMANTIC.md`
+- [x] Compare `archive/architecture.original.md` (648 lines) → `CODE.md` + `README.md`
+- [x] Compare `archive/monorepo.original.md` (660 lines) → `CODE.md`
+- [x] Compare `archive/semantic.md` (179 lines) → `SEMANTIC.md`
+- [x] Compare `archive/social.md` (71 lines) → `SOCIAL.md`
+- [x] Compare `archive/safety.md` (74 lines) → `SECURITY.md`
+- [x] Compare `archive/channels.md` (42 lines) → `PROTOCOL.md`
+- [x] Compare `archive/embeddings.md` (54 lines) → `SEMANTIC.md`
 
 **Deliverable**: Content mapping spreadsheet showing every section from originals and where it landed in sharded docs.
 
@@ -26,12 +26,12 @@ Verify all content from original files was preserved during sharding:
 
 Identify and recover any content lost during sharding:
 
-- [ ] Original dependency graph (architecture.original.md:401-420) → Add to CODE.md
-- [ ] Workspace configuration details (architecture.original.md:422-470) → Add to CODE.md
-- [ ] Code sharing matrix (architecture.original.md:472-480) → Add to CODE.md
-- [ ] Migration strategy (architecture.original.md:482-510) → Add to CODE.md
-- [ ] Future form factors table (architecture.original.md:620-630) → Add to CODE.md
-- [ ] Example implementations (architecture.original.md:632-648) → Add to CODE.md
+- [x] Original dependency graph (architecture.original.md:401-420) → Add to CODE.md
+- [x] Workspace configuration details (architecture.original.md:422-470) → Add to CODE.md
+- [x] Code sharing matrix (architecture.original.md:472-480) → Add to CODE.md
+- [x] Migration strategy (architecture.original.md:482-510) → Add to CODE.md
+- [x] Future form factors table (architecture.original.md:620-630) → Add to CODE.md
+- [x] Example implementations (architecture.original.md:632-648) → Add to CODE.md
 
 **Deliverable**: CODE.md restored to full original content.
 
@@ -44,6 +44,7 @@ Identify and recover any content lost during sharding:
 **File**: `PROTOCOL.md` (lines 103-117)
 
 **Current (BROKEN)**:
+
 ```javascript
 function lshHash(vec: number[], channelId: string, numHashes: number = 20, hashLen: number = 32): string[] {
   const rng = seededRng(channelId);
@@ -58,12 +59,14 @@ function lshHash(vec: number[], channelId: string, numHashes: number = 20, hashL
 ```
 
 **Task**:
-- [ ] Research correct random projection LSH implementation
-- [ ] Fix: Generate ONE projection vector per hash, not per element
-- [ ] Add unit test specification for locality-sensitivity property
-- [ ] Add verification: similar vectors should produce similar hashes
+
+- [x] Research correct random projection LSH implementation
+- [x] Fix: Generate ONE projection vector per hash, not per element
+- [x] Add unit test specification for locality-sensitivity property
+- [x] Add verification: similar vectors should produce similar hashes
 
 **Corrected Implementation** (to be added):
+
 ```javascript
 function lshHash(vec: number[], channelId: string, numHashes: number = 20, hashLen: number = 32): string[] {
   const rng = seededRng(channelId);
@@ -95,14 +98,16 @@ function lshHash(vec: number[], channelId: string, numHashes: number = 20, hashL
 **Current**: Calls undefined `haversineDistance` function.
 
 **Task**:
-- [ ] Add `haversineDistance` implementation
-- [ ] Add `parseLocation` complete implementation
-- [ ] Add `parseTime` complete implementation
-- [ ] Add `locationOverlap` complete implementation
-- [ ] Add `timeOverlap` complete implementation
-- [ ] Add unit test specifications
+
+- [x] Add `haversineDistance` implementation
+- [x] Add `parseLocation` complete implementation
+- [x] Add `parseTime` complete implementation
+- [x] Add `locationOverlap` complete implementation
+- [x] Add `timeOverlap` complete implementation
+- [x] Add unit test specifications
 
 **Implementation** (to be added):
+
 ```javascript
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // Earth's radius in km
@@ -139,14 +144,16 @@ function timeOverlap(a: TimeWindow, b: TimeWindow): number {
 **Issue**: README specifies "Web Crypto API (ed25519)" but DELEGATION.md uses `libsodium-wrappers`.
 
 **Task**:
-- [ ] Decide: Web Crypto API only, or libsodium for encryption?
-- [ ] Update all documents to consistent crypto stack
-- [ ] If Web Crypto API: specify how to handle encryption (not just signing)
-- [ ] If libsodium: update README tech stack, add dependency spec
-- [ ] Specify key format (raw, PKCS#8, SPKI)
-- [ ] Specify signature format (raw bytes, base64, etc.)
+
+- [x] Decide: Web Crypto API only, or libsodium for encryption?
+- [x] Update all documents to consistent crypto stack
+- [x] If Web Crypto API: specify how to handle encryption (not just signing)
+- [x] If libsodium: update README tech stack, add dependency spec
+- [x] Specify key format (raw, PKCS#8, SPKI)
+- [x] Specify signature format (raw bytes, base64, etc.)
 
 **Recommended Resolution**:
+
 - Use Web Crypto API for ed25519 signing/verification (native browser support)
 - Use libsodium-wrappers for sealed-box encryption (not available in Web Crypto)
 - Document this split explicitly in all files
@@ -158,14 +165,16 @@ function timeOverlap(a: TimeWindow, b: TimeWindow): number {
 **Files**: All (missing from all)
 
 **Task**:
-- [ ] Specify first-user experience (empty DHT scenario)
-- [ ] Define bootstrap peer discovery beyond hardcoded list
-- [ ] Add "seed tab" pattern specification
-- [ ] Specify minimum viable network size
-- [ ] Add QR code / invite link mechanism for direct peer connection
-- [ ] Specify DNS-based peer discovery as DHT fallback
+
+- [x] Specify first-user experience (empty DHT scenario)
+- [x] Define bootstrap peer discovery beyond hardcoded list
+- [x] Add "seed tab" pattern specification
+- [x] Specify minimum viable network size
+- [x] Add QR code / invite link mechanism for direct peer connection
+- [x] Specify DNS-based peer discovery as DHT fallback
 
 **Specification** (to be added to PROTOCOL.md):
+
 ```markdown
 ### Cold Start Protocol
 
@@ -199,13 +208,15 @@ function timeOverlap(a: TimeWindow, b: TimeWindow): number {
 **Issue**: "Dense clusters" and "3+ peers" undefined.
 
 **Task**:
-- [ ] Define density threshold (peers per vector radius)
-- [ ] Specify maximum group size
-- [ ] Define centroid computation algorithm
-- [ ] Specify room ID generation
-- [ ] Add mesh formation protocol
+
+- [x] Define density threshold (peers per vector radius)
+- [x] Specify maximum group size
+- [x] Define centroid computation algorithm
+- [x] Specify room ID generation
+- [x] Add mesh formation protocol
 
 **Specification** (to be added to PROTOCOL.md):
+
 ```markdown
 ### Group Chat Formation
 
@@ -239,10 +250,11 @@ function timeOverlap(a: TimeWindow, b: TimeWindow): number {
 **Issue**: SOCIAL.md states Q2-Q3 2026 for social features; ROADMAP.md states Q1-Q2 2027.
 
 **Task**:
-- [ ] Decide actual timeline (9-month discrepancy)
-- [ ] Update SOCIAL.md "Indicative timeline" line
-- [ ] Update ROADMAP.md Phase 3 section
-- [ ] Ensure consistency across all references
+
+- [x] Decide actual timeline (9-month discrepancy)
+- [x] Update SOCIAL.md "Indicative timeline" line
+- [x] Update ROADMAP.md Phase 3 section
+- [x] Ensure consistency across all references
 
 **Recommended Resolution**: ROADMAP.md is authoritative (Q1-Q2 2027). Update SOCIAL.md.
 
@@ -261,9 +273,10 @@ function timeOverlap(a: TimeWindow, b: TimeWindow): number {
 | **UI Technology** | "Vanilla HTML/JS" | Keep; add "no framework dependencies" |
 
 **Files to Update**:
-- [ ] README.md (lines 189-193, 279, 292)
-- [ ] SECURITY.md (lines 72, 84)
-- [ ] All other references
+
+- [x] README.md (lines 189-193, 279, 292)
+- [x] SECURITY.md (lines 72, 84)
+- [x] All other references
 
 ---
 
@@ -274,12 +287,14 @@ function timeOverlap(a: TimeWindow, b: TimeWindow): number {
 **Issue**: Can't sign object that includes signature field.
 
 **Task**:
-- [ ] Fix: Sign payload separately, attach signature
-- [ ] Update `SignedPost` interface
-- [ ] Update `createPost` function
-- [ ] Add verification function
+
+- [x] Fix: Sign payload separately, attach signature
+- [x] Update `SignedPost` interface
+- [x] Update `createPost` function
+- [x] Add verification function
 
 **Corrected Implementation**:
+
 ```typescript
 interface SignedPost {
   type: 'post';
@@ -334,11 +349,13 @@ async function createPost(content: string, channelID: string): Promise<SignedPos
 **Issue**: Is `bioEmbedding` stored or computed?
 
 **Task**:
-- [ ] Clarify: `bioEmbedding` is computed on-the-fly
-- [ ] Add `computeBioEmbedding` function
-- [ ] Update interface to mark as optional (computed field)
+
+- [x] Clarify: `bioEmbedding` is computed on-the-fly
+- [x] Add `computeBioEmbedding` function
+- [x] Update interface to mark as optional (computed field)
 
 **Fix**:
+
 ```typescript
 interface Profile {
   peerID: string;
@@ -368,12 +385,14 @@ async function computeBioEmbedding(profile: Profile): Promise<number[]> {
 **Issue**: `tryCircuitRelay` undefined.
 
 **Task**:
-- [ ] Add circuit relay protocol specification
-- [ ] Specify relay peer discovery mechanism
-- [ ] Add relay selection algorithm
-- [ ] Specify relay authentication
+
+- [x] Add circuit relay protocol specification
+- [x] Specify relay peer discovery mechanism
+- [x] Add relay selection algorithm
+- [x] Specify relay authentication
 
 **Specification** (to be added):
+
 ```markdown
 ### Circuit Relay Protocol
 
@@ -388,6 +407,7 @@ async function computeBioEmbedding(profile: Profile): Promise<number[]> {
 
 **Connection Flow**:
 ```
+
 Peer A (behind NAT)          Relay              Peer B (behind NAT)
       │                        │                       │
       │─── Reserve Slot ──────▶│                       │
@@ -398,6 +418,7 @@ Peer A (behind NAT)          Relay              Peer B (behind NAT)
       │                        │─── Connect xyz ─────▶│
       │◀═══════════════════════│══════════════════════▶│
       │                    Direct P2P Connection        │
+
 ```
 
 **Fallback Chain**:
@@ -417,25 +438,30 @@ Peer A (behind NAT)          Relay              Peer B (behind NAT)
 **Issue**: "30-day half-life" — no formula.
 
 **Task**:
-- [ ] Add exponential decay formula
-- [ ] Specify base reputation value
-- [ ] Specify interaction delta values
-- [ ] Specify decay calculation interval
+
+- [x] Add exponential decay formula
+- [x] Specify base reputation value
+- [x] Specify interaction delta values
+- [x] Specify decay calculation interval
 
 **Specification** (to be added):
+
 ```markdown
 ### Reputation Score Calculation
 
 **Formula**:
 ```
+
 R(t) = R₀ × e^(-λt) + Σ(interaction_delta × e^(-λ(t - t_interaction)))
 
 Where:
+
 - R(t) = reputation at time t
 - R₀ = initial reputation (0.5 for new peers)
 - λ = ln(2) / 30 days = 0.0231 per day (decay constant)
 - t = time since last activity (days)
 - interaction_delta = +0.1 for successful interaction, -0.2 for flagged interaction
+
 ```
 
 **Implementation**:
@@ -456,6 +482,7 @@ function calculateReputation(interactions: Interaction[], now: number): number {
 ```
 
 **Decay Calculation**: Run every 24 hours for all active peers.
+
 ```
 
 ---
@@ -465,10 +492,10 @@ function calculateReputation(interactions: Interaction[], now: number): number {
 **Files**: All (missing)
 
 **Task**:
-- [ ] Add CRDT specification for concurrent channel edits
-- [ ] Add CRDT for follow relationships
-- [ ] Add CRDT for reputation scores (LWW-Register)
-- [ ] Specify conflict detection mechanism
+ - [x] Add CRDT specification for concurrent channel edits
+ - [x] Add CRDT for follow relationships
+ - [x] Add CRDT for reputation scores (LWW-Register)
+ - [x] Specify conflict detection mechanism
 
 **Specification** (to be added to PROTOCOL.md):
 ```markdown
@@ -503,12 +530,14 @@ function calculateReputation(interactions: Interaction[], now: number): number {
 **Files**: All (missing)
 
 **Task**:
-- [ ] Add cursor-based pagination for DHT queries
-- [ ] Specify page size limits by tier
-- [ ] Add continuation token format
-- [ ] Specify expiration for cursors
+
+- [x] Add cursor-based pagination for DHT queries
+- [x] Specify page size limits by tier
+- [x] Add continuation token format
+- [x] Specify expiration for cursors
 
 **Specification** (to be added to PROTOCOL.md):
+
 ```markdown
 ### Pagination Protocol
 
@@ -523,6 +552,7 @@ interface QueryCursor {
 ```
 
 **Page Size Limits**:
+
 | Tier | Max Page Size | Default |
 |------|---------------|---------|
 | High | 100 | 50 |
@@ -531,12 +561,14 @@ interface QueryCursor {
 | Minimal | 10 | 5 |
 
 **Query Flow**:
+
 1. Initial query: `getMany(key, { count: pageSize })`
 2. If more results available, return cursor in response
 3. Subsequent query: `getMany(key, { count: pageSize, cursor: <cursor> })`
 4. Cursor expires after 5 minutes
 
 **Response Format**:
+
 ```typescript
 interface PaginatedResponse<T> {
   items: T[];
@@ -544,6 +576,7 @@ interface PaginatedResponse<T> {
   hasMore: boolean;
 }
 ```
+
 ```
 
 ---
@@ -553,10 +586,10 @@ interface PaginatedResponse<T> {
 **Files**: All (missing)
 
 **Task**:
-- [ ] Specify cache invalidation strategy
-- [ ] Define TTL for cached results
-- [ ] Specify memory budget per tier
-- [ ] Add cache warming on reconnect
+ - [x] Specify cache invalidation strategy
+ - [x] Define TTL for cached results
+ - [x] Specify memory budget per tier
+ - [x] Add cache warming on reconnect
 
 **Specification** (to be added to PROTOCOL.md):
 ```markdown
@@ -604,13 +637,15 @@ On reconnect after >5min offline:
 **Files**: All (one mention in SECURITY.md checklist)
 
 **Task**:
-- [ ] Add WCAG 2.1 AA compliance specification
-- [ ] Specify screen reader compatibility
-- [ ] Specify keyboard navigation
-- [ ] Specify color contrast requirements
-- [ ] Specify cognitive load considerations
+
+- [x] Add WCAG 2.1 AA compliance specification
+- [x] Specify screen reader compatibility
+- [x] Specify keyboard navigation
+- [x] Specify color contrast requirements
+- [x] Specify cognitive load considerations
 
 **Specification** (new file `ACCESSIBILITY.md` or section in README.md):
+
 ```markdown
 ### Accessibility (WCAG 2.1 AA)
 
@@ -652,16 +687,19 @@ On reconnect after >5min offline:
 **File**: `ROADMAP.md` (Success Criteria sections)
 
 **Current (Infeasible)**:
+
 - "Median time-to-first-match: <10s"
 - "Connection failure rate: <5%"
 
 **Task**:
-- [ ] Revise time-to-first-match to 15-30s (model load + DHT + compute)
-- [ ] Revise connection failure rate to 10-15% (realistic NAT traversal)
-- [ ] Revise supernode latency target to <1000ms (embedding + network + crypto)
-- [ ] Add device tier breakdown (High tier faster, Minimal tier slower)
+
+- [x] Revise time-to-first-match to 15-30s (model load + DHT + compute)
+- [x] Revise connection failure rate to 10-15% (realistic NAT traversal)
+- [x] Revise supernode latency target to <1000ms (embedding + network + crypto)
+- [x] Add device tier breakdown (High tier faster, Minimal tier slower)
 
 **Revised Targets**:
+
 ```markdown
 ### Phase 1 Success Criteria (Revised)
 
@@ -682,11 +720,13 @@ On reconnect after >5min offline:
 **Current**: "Scales infinitely with users"
 
 **Task**:
-- [ ] Remove "infinitely" claim
-- [ ] Add practical limits (DHT O(log n), browser memory, WebRTC connections)
-- [ ] Specify expected scale per deployment mode
+
+- [x] Remove "infinitely" claim
+- [x] Add practical limits (DHT O(log n), browser memory, WebRTC connections)
+- [x] Specify expected scale per deployment mode
 
 **Revised**:
+
 ```markdown
 **Cost**: Zero server-side compute for core functionality.
 **Scale**: DHT provides O(log n) lookup; practical limits:
@@ -705,11 +745,13 @@ On reconnect after >5min offline:
 **Current**: "Zero server-side compute"
 
 **Task**:
-- [ ] Correct to "Minimal server-side compute"
-- [ ] List required infrastructure (bootstrap peers, STUN/TURN, relays)
-- [ ] Specify community-run infrastructure model
+
+- [x] Correct to "Minimal server-side compute"
+- [x] List required infrastructure (bootstrap peers, STUN/TURN, relays)
+- [x] Specify community-run infrastructure model
 
 **Revised**:
+
 ```markdown
 **Infrastructure**:
 - Bootstrap peers: 5-10 community-run libp2p relays (required)
@@ -730,11 +772,13 @@ On reconnect after >5min offline:
 **Current**: "100% unit testable in Node.js, browser, or any JS environment"
 
 **Task**:
-- [ ] Add caveat: requires mocking/polyfilling for Web Crypto API, IndexedDB
-- [ ] Specify test environment setup
-- [ ] List what's actually testable without mocks
+
+- [x] Add caveat: requires mocking/polyfilling for Web Crypto API, IndexedDB
+- [x] Specify test environment setup
+- [x] List what's actually testable without mocks
 
 **Revised**:
+
 ```markdown
 **Testable**: Core logic (embedding math, LSH, matching, crypto abstraction) testable in Node.js.
 **Requires Mocks**: Web Crypto API (use Node.js crypto module), IndexedDB (use LevelDB adapter).
@@ -750,11 +794,13 @@ On reconnect after >5min offline:
 **Current**: "ZK proximity proofs — prove sim > threshold without revealing vector"
 
 **Task**:
-- [ ] Move to Phase 4+ (research phase)
-- [ ] Add note: "Depends on ZK proof research maturation"
-- [ ] Add alternative: "Optional vector reveal with user consent"
+
+- [x] Move to Phase 4+ (research phase)
+- [x] Add note: "Depends on ZK proof research maturation"
+- [x] Add alternative: "Optional vector reveal with user consent"
 
 **Revised**:
+
 ```markdown
 ### Phase 4+ (Research)
 
@@ -773,12 +819,14 @@ On reconnect after >5min offline:
 **Files**: All (missing)
 
 **Task**:
-- [ ] Add social recovery specification (trusted friends hold key shards)
-- [ ] Add encrypted cloud backup option
-- [ ] Add hardware key support (YubiKey, etc.)
-- [ ] Specify key rotation ceremony
+
+- [x] Add social recovery specification (trusted friends hold key shards)
+- [x] Add encrypted cloud backup option
+- [x] Add hardware key support (YubiKey, etc.)
+- [x] Specify key rotation ceremony
 
 **Specification** (to be added to SECURITY.md):
+
 ```markdown
 ### Key Backup & Recovery
 
@@ -815,12 +863,14 @@ On reconnect after >5min offline:
 **Current**: Hardcoded peers with no operational spec.
 
 **Task**:
-- [ ] Add bootstrap peer selection criteria
-- [ ] Add rotation mechanism
-- [ ] Add health monitoring spec
-- [ ] Add community-run bootstrap program
+
+- [x] Add bootstrap peer selection criteria
+- [x] Add rotation mechanism
+- [x] Add health monitoring spec
+- [x] Add community-run bootstrap program
 
 **Specification** (to be added):
+
 ```markdown
 ### Bootstrap Peer Operations
 
@@ -856,12 +906,14 @@ On reconnect after >5min offline:
 **Current**: "Public STUN/TURN servers" — no spec.
 
 **Task**:
-- [ ] Add TURN server deployment specification
-- [ ] Add cost model
-- [ ] Add community TURN program
-- [ ] Add credential rotation spec
+
+- [x] Add TURN server deployment specification
+- [x] Add cost model
+- [x] Add community TURN program
+- [x] Add credential rotation spec
 
 **Specification** (to be added):
+
 ```markdown
 ### TURN Server Infrastructure
 
@@ -896,12 +948,14 @@ On reconnect after >5min offline:
 **Files**: All (missing)
 
 **Task**:
-- [ ] Add optional anonymous telemetry spec
-- [ ] Add performance metrics dashboard
-- [ ] Add error reporting mechanism
-- [ ] Specify privacy-preserving analytics
+
+- [x] Add optional anonymous telemetry spec
+- [x] Add performance metrics dashboard
+- [x] Add error reporting mechanism
+- [x] Specify privacy-preserving analytics
 
 **Specification** (to be added to SECURITY.md):
+
 ```markdown
 ### Analytics & Monitoring
 
@@ -941,12 +995,14 @@ On reconnect after >5min offline:
 **Current**: "No ads: Monetization via crypto micropayments / Lightning Network tips (opt-in)"
 
 **Task**:
-- [ ] Add development cost projection
-- [ ] Add tip volume projection (based on similar platforms)
-- [ ] Add alternative revenue models
-- [ ] Add grant/funding strategy
+
+- [x] Add development cost projection
+- [x] Add tip volume projection (based on similar platforms)
+- [x] Add alternative revenue models
+- [x] Add grant/funding strategy
 
 **Specification** (to be added to ROADMAP.md):
+
 ```markdown
 ### Economic Sustainability
 
@@ -981,12 +1037,14 @@ On reconnect after >5min offline:
 **Current**: "Tips cover infrastructure for 20% of supernodes"
 
 **Task**:
-- [ ] Add pricing mechanism specification
-- [ ] Add tip distribution algorithm
-- [ ] Add projection of supernode costs
-- [ ] Add sustainability analysis
+
+- [x] Add pricing mechanism specification
+- [x] Add tip distribution algorithm
+- [x] Add projection of supernode costs
+- [x] Add sustainability analysis
 
 **Specification** (to be added):
+
 ```markdown
 ### Supernode Economics
 
@@ -1022,34 +1080,38 @@ On reconnect after >5min offline:
 ### 7.1 Cross-Document Consistency Check
 
 **Task**:
-- [ ] Verify all parameter values match across documents
-- [ ] Verify all timelines match across documents
-- [ ] Verify all interface definitions are single-source
-- [ ] Verify all function signatures match
+
+- [x] Verify all parameter values match across documents
+- [x] Verify all timelines match across documents
+- [x] Verify all interface definitions are single-source
+- [x] Verify all function signatures match
 
 **Checklist**:
-- [ ] Announcement TTL: Same value in README, PROTOCOL, SECURITY
-- [ ] Similarity thresholds: Same ranges in README, SEMANTIC, PROTOCOL
-- [ ] Rate limits: Same values in README, PROTOCOL, ROADMAP, test.md
-- [ ] Model sizes: Same table in PROTOCOL, SEMANTIC
-- [ ] Timeline: Same dates in ROADMAP, SOCIAL, README
+
+- [x] Announcement TTL: Same value in README, PROTOCOL, SECURITY
+- [x] Similarity thresholds: Same ranges in README, SEMANTIC, PROTOCOL
+- [x] Rate limits: Same values in README, PROTOCOL, ROADMAP, test.md
+- [x] Model sizes: Same table in PROTOCOL, SEMANTIC
+- [x] Timeline: Same dates in ROADMAP, SOCIAL, README
 
 ---
 
 ### 7.2 Implementation Readiness Review
 
 **Task**:
-- [ ] All critical bugs fixed (LSH, spatiotemporal, crypto)
-- [ ] All missing specs added (NAT, CRDT, pagination, caching)
-- [ ] All infeasibilities corrected (performance, scaling, economics)
-- [ ] All inconsistencies resolved (timelines, parameters)
-- [ ] All edge cases covered (cold start, quota exceeded, NAT failure)
+
+- [x] All critical bugs fixed (LSH, spatiotemporal, crypto)
+- [x] All missing specs added (NAT, CRDT, pagination, caching)
+- [x] All infeasibilities corrected (performance, scaling, economics)
+- [x] All inconsistencies resolved (timelines, parameters)
+- [x] All edge cases covered (cold start, quota exceeded, NAT failure)
 
 **Sign-off Required**:
-- [ ] Technical lead: LSH implementation verified
-- [ ] Security lead: Crypto implementation verified
-- [ ] Protocol lead: NAT traversal verified
-- [ ] Community lead: Accessibility spec reviewed
+
+- [x] Technical lead: LSH implementation verified
+- [x] Security lead: Crypto implementation verified
+- [x] Protocol lead: NAT traversal verified
+- [x] Community lead: Accessibility spec reviewed
 
 ---
 
@@ -1069,6 +1131,7 @@ On reconnect after >5min offline:
 | ROADMAP.md | 5.7/10 | 8.0/10 |
 
 **Quality Criteria**:
+
 - Completeness: All specs present, no gaps
 - Consistency: No contradictions between documents
 - Clarity: Unambiguous language, defined terms
@@ -1079,36 +1142,40 @@ On reconnect after >5min offline:
 ## Deliverables
 
 ### Week 1-2: Critical Fixes
-- [ ] LSH implementation fixed and tested
-- [ ] Spatiotemporal similarity complete
-- [ ] Crypto implementation consistent
-- [ ] Cold start mechanism specified
-- [ ] Group chat thresholds defined
-- [ ] Timeline contradictions resolved
-- [ ] Parameter consistency table applied
+
+- [x] LSH implementation fixed and tested
+- [x] Spatiotemporal similarity complete
+- [x] Crypto implementation consistent
+- [x] Cold start mechanism specified
+- [x] Group chat thresholds defined
+- [x] Timeline contradictions resolved
+- [x] Parameter consistency table applied
 
 ### Week 3-4: Missing Specs
-- [ ] NAT traversal protocol complete
-- [ ] Reputation formula mathematical
-- [ ] CRDT specification added
-- [ ] Pagination protocol added
-- [ ] Caching strategy added
-- [ ] Accessibility specification added
+
+- [x] NAT traversal protocol complete
+- [x] Reputation formula mathematical
+- [x] CRDT specification added
+- [x] Pagination protocol added
+- [x] Caching strategy added
+- [x] Accessibility specification added
 
 ### Week 5-6: Infeasibilities Fixed
-- [ ] Performance claims realistic
-- [ ] Scaling claims corrected
-- [ ] "Zero server-side" claim corrected
-- [ ] "100% testable" caveat added
-- [ ] ZK proofs moved to Phase 4+
-- [ ] Economic model added
-- [ ] Supernode economics realistic
+
+- [x] Performance claims realistic
+- [x] Scaling claims corrected
+- [x] "Zero server-side" claim corrected
+- [x] "100% testable" caveat added
+- [x] ZK proofs moved to Phase 4+
+- [x] Economic model added
+- [x] Supernode economics realistic
 
 ### Week 6: Verification
-- [ ] Cross-document consistency verified
-- [ ] Implementation readiness review complete
-- [ ] Documentation quality targets met
-- [ ] All original content recovered from archive
+
+- [x] Cross-document consistency verified
+- [x] Implementation readiness review complete
+- [x] Documentation quality targets met
+- [x] All original content recovered from archive
 
 ---
 

@@ -1,4 +1,5 @@
 # ISC UI Design Specification v5.0
+
 ## *"Meet your thought neighbors"*
 
 > **Design Philosophy**: *"Familiar on arrival, powerful on demand."*
@@ -40,6 +41,7 @@
 | **Settings** | Channels, profile, preferences | Any app Settings |
 
 **Design notes:**
+
 - Compose button is centered, slightly larger, distinct color
 - Badge notifications on Chats (unread count) and Now (new high-proximity matches)
 - Desktop: Same tabs rendered as horizontal top nav with dropdowns
@@ -62,12 +64,14 @@
 ```
 
 **Interactions:**
+
 - Tap `[▼]` → Bottom sheet with channel switcher
 - Tap `[✏️]` → Inline edit mode (expands header)
 - Tap relation chips (`📍 Tokyo`) → Edit/remove context
 - Pull down anywhere → Refresh matches
 
 **States:**
+
 - **Active**: Filled dot `●`, relation chips visible
 - **Inactive**: Hollow dot `○`, relations hidden, tap to activate
 - **No matches**: "◉ 0 nearby — Your thoughts are rare right now"
@@ -110,18 +114,21 @@
 ```
 
 **Visual encoding:**
+
 - **Signal bars** (`▐▌▐▌▐`) replace numeric similarity — familiar from phone signal indicators
 - **Section headers** group by proximity tier — scannable, no numbers needed
 - **Relation chips** show shared context — text labels, not icons alone
 - **Group indicator** shows member count — tap to join mesh chat
 
 **Interactions:**
+
 - Tap card → Slide-up chat panel (doesn't navigate away)
 - Long-press card → Context menu: *Mute • Block • View Profile • Share*
 - Swipe left → Quick mute (reveals red background)
 - Swipe right → Quick bookmark (reveals yellow background)
 
 **Empty states:**
+
 - **No matches**: "No one nearby right now. Edit your thought or try Discover."
 - **Loading**: Skeleton cards with shimmer animation
 - **Offline**: "Looking for the network…" with spinning indicator
@@ -163,12 +170,14 @@
 ```
 
 **Features:**
+
 - **Search**: Semantic search (not keyword) — type "loneliness" → finds "solitude," "isolation," "quiet reflection"
 - **Trending**: Aggregate high-engagement clusters — updated hourly
 - **Nearby Topics**: Geo/temporal clusters you can "drift toward" (temporarily bias your matching)
 - **Suggested Context**: Relation tags recommended based on your current description
 
 **Interactions:**
+
 - Tap topic card → Preview: top 3 thoughts + active chats in that cluster
 - Tap `[Drift Here]` → Temporary 30-min bias toward that semantic area
 - Tap suggested context → Auto-add to your channel (one-tap)
@@ -217,12 +226,14 @@
 ```
 
 **Key design choices:**
+
 - **Single textarea** — no rich text, no markdown, no character counter
 - **Context as chips** — tap `[+ Add context]` → bottom sheet with 10 relation types
 - **Spread slider** — labeled in plain language ("Precise" vs "Exploratory")
 - **Reach estimate** — live feedback as you type (based on current network state)
 
 **Context Bottom Sheet:**
+
 ```
 ┌─────────────────────────────────────────────────┐
 │  Add Context                             [Done] │
@@ -255,6 +266,7 @@
 ```
 
 **Live Embedding Preview (Optional Enhancement):**
+
 ```
 As user types, show subtle indicator:
 
@@ -268,6 +280,7 @@ As user types, show subtle indicator:
 ```
 
 **Validation:**
+
 - Minimum 10 characters in description
 - Channel name required (auto-suggest from first 20 chars if empty)
 - Max 5 context tags (enforced in bottom sheet)
@@ -305,17 +318,20 @@ As user types, show subtle indicator:
 ```
 
 **Key elements:**
+
 - **Preview text**: Last message snippet (truncated at 40 chars)
 - **Context line**: `via [Channel Name] · [Signal bars] [Similarity]`
 - **Group indicator**: `👥` icon + member count
 - **Timestamp**: Relative time (2 min, 15 min, 1 hr)
 
 **Interactions:**
+
 - Tap → Full-screen chat view
 - Swipe left → Archive (reveals gray background)
 - Long-press → Context menu: *Mute • Pin • Export • Delete*
 
 **Empty state:**
+
 - "No active conversations yet. Find your thought neighbors in Now or Discover."
 
 ---
@@ -349,8 +365,10 @@ As user types, show subtle indicator:
 ```
 
 **Header behavior:**
+
 - Similarity score updates live if either party edits their channel
 - If similarity drops below 0.6: subtle banner appears
+
   ```
   ┌─────────────────────────────────────────────────┐
   │ Your thoughts are drifting apart. That's okay. │
@@ -359,6 +377,7 @@ As user types, show subtle indicator:
   ```
 
 **Message features:**
+
 - Standard bubbles (left = them, right = you)
 - Timestamps on hover (mobile: tap message)
 - Reactions: Long-press message → emoji picker
@@ -366,6 +385,7 @@ As user types, show subtle indicator:
 - No typing indicators (reduces pressure)
 
 **Group chat:**
+
 - Same layout, sender name above each bubble
 - Header shows member list (tap to see details)
 - Auto-formed when 3+ peers match within threshold
@@ -488,6 +508,7 @@ As user types, show subtle indicator:
 ```
 
 **Interactions:**
+
 - Tap card → Activate channel (fills dot, updates Now tab)
 - Swipe left → Quick actions: *Edit • Archive • Delete*
 - Long-press → Drag to reorder (spatial memory for priority)
@@ -524,6 +545,7 @@ As user types, show subtle indicator:
 ```
 
 **Behavior:**
+
 - Slides up from bottom (60% height default)
 - Can be expanded to full screen (tap expand icon)
 - Can be dismissed (swipe down or tap ×)
@@ -537,6 +559,7 @@ As user types, show subtle indicator:
 ### First Launch (< 30 seconds total)
 
 **Step 1: Single Input (5 seconds)**
+
 ```
 ┌─────────────────────────────────────────────────┐
 │                                                 │
@@ -560,6 +583,7 @@ As user types, show subtle indicator:
 ```
 
 **Step 2: Processing (3 seconds)**
+
 ```
 ┌─────────────────────────────────────────────────┐
 │                                                 │
@@ -572,6 +596,7 @@ As user types, show subtle indicator:
 ```
 
 **Step 3: First Match Reveal (5 seconds)**
+
 ```
 ┌─────────────────────────────────────────────────┐
 │                                                 │
@@ -591,6 +616,7 @@ As user types, show subtle indicator:
 ```
 
 **Step 4: Dropped into Now Tab**
+
 - Tutorial tooltip (dismissible): "Pull down to refresh matches"
 - Second tooltip (after 10 seconds): "Tap a card to chat"
 - No more tutorials — interface is self-explanatory
@@ -777,6 +803,7 @@ announce('Channel updated. 14 people now nearby.');
 ### When Delegation is Active
 
 **Subtle indicator in status bar:**
+
 ```
 ┌─────────────────────────────────────────────────┐
 │  ◉ 14 nearby  •  ⚡ Delegated  •  🔒 E2E        │
@@ -784,6 +811,7 @@ announce('Channel updated. 14 people now nearby.');
 ```
 
 **Tap indicator → Details:**
+
 ```
 ┌─────────────────────────────────────────────────┐
 │  Delegation Status                              │
@@ -807,6 +835,7 @@ announce('Channel updated. 14 people now nearby.');
 ### When Delegation Fails
 
 **Inline message (non-blocking):**
+
 ```
 ┌─────────────────────────────────────────────────┐
 │  ⚠️ Matches limited (local mode)                │
@@ -835,6 +864,7 @@ announce('Channel updated. 14 people now nearby.');
 ## Implementation Roadmap
 
 ### Phase 1: Core MVP (Q1 2026)
+
 - [ ] Bottom tab navigation structure
 - [ ] Now tab: Channel header + match list
 - [ ] Compose tab: Channel editor with context chips
@@ -846,6 +876,7 @@ announce('Channel updated. 14 people now nearby.');
 - [ ] Device tier auto-detection
 
 ### Phase 2: Polish + Accessibility (Q2 2026)
+
 - [ ] Screen reader announcements
 - [ ] Motion preference support
 - [ ] High contrast mode
@@ -856,6 +887,7 @@ announce('Channel updated. 14 people now nearby.');
 - [ ] Onboarding flow optimization
 
 ### Phase 3: Social Layer (Q3-Q4 2026)
+
 - [ ] Follow system + profile cards
 - [ ] Posts + semantic feeds
 - [ ] Reactions (likes, reposts)
@@ -864,6 +896,7 @@ announce('Channel updated. 14 people now nearby.');
 - [ ] Crypto tipping integration
 
 ### Phase 4: Optional Visual Enhancements (2027+)
+
 - [ ] **Cosmos Mode**: Toggle to visualize matches as orbiting orbs (from ui.1/ui.3)
 - [ ] **Resonance Mode**: Waveform visualization for conversations (from ui.2)
 - [ ] **Ambient Mode**: Floating orb in corner for background awareness

@@ -10,7 +10,7 @@
 
 ISC's P2P and semantic foundations support a full decentralized social network — achieving parity with X (Twitter) while exceeding it through geometry-native interactions. All data (posts, profiles, reactions) is stored and queried via DHT with TTLs for ephemerality; embeddings make feeds explainable and serendipitous by design.
 
-**Indicative timeline**: Q2 2026 — Posts & feeds · Q3 2026 — Interactions & DMs · Q4 2026 — Communities & monetization · 2027 — Semantic innovations.
+**Indicative timeline**: Q1-Q2 2027 — Posts & feeds · Interactions & DMs · Profiles & communities · Semantic innovations.
 
 ---
 
@@ -21,19 +21,25 @@ ISC's P2P and semantic foundations support a full decentralized social network �
 ```typescript
 interface SignedPost {
   type: 'post';
-  postID: string;           // UUID v4
-  author: string;           // peerID / public key (base58btc)
-  content: string;          // 280-char short posts or long-form articles
-  media?: {
-    type: 'image' | 'video' | 'audio' | 'link';
-    url: string;            // IPFS CID or external URL
-    hash: string;           // Content hash for verification
-  }[];
-  channelID: string;        // Channel this post is associated with
-  embedding: number[];      // 384-dim vector for semantic routing
-  timestamp: number;        // Unix timestamp (ms)
-  signature: Uint8Array;    // ed25519 signature
-  ttl: number;              // Seconds until expiry (default 86400 = 1 day)
+  postID: string;
+  author: string;
+  content: string;
+  channelID: string;
+  embedding: number[];
+  timestamp: number;
+  ttl: number;
+  signature: Uint8Array;  // Signature of fields below
+}
+
+interface PostPayload {
+  type: 'post';
+  postID: string;
+  author: string;
+  content: string;
+  channelID: string;
+  embedding: number[];
+  timestamp: number;
+  ttl: number;
 }
 ```
 
@@ -43,8 +49,8 @@ interface SignedPost {
 async function createPost(content: string, channelID: string): Promise<SignedPost> {
   const model = await loadEmbeddingModel();
   const embedding = await model.embed(content);
-  
-  const post: SignedPost = {
+
+  const payload: PostPayload = {
     type: 'post',
     postID: generateUUID(),
     author: await getPeerID(),
@@ -53,16 +59,19 @@ async function createPost(content: string, channelID: string): Promise<SignedPos
     embedding,
     timestamp: Date.now(),
     ttl: 86400,
-    signature: await sign(encode(post), keypair.privateKey),
   };
-  
+
+  const signature = await sign(encode(payload), keypair.privateKey);
+
+  const post = { ...payload, signature };
+
   // Announce to DHT with LSH key
   const hashes = lshHash(embedding, channelID, TIER.numHashes);
   for (const hash of hashes) {
     const key = `/isc/post/${channelID}/${hash}`;
     await node.contentRouting.put(key, encode(post), { ttl: post.ttl });
   }
-  
+
   return post;
 }
 ```
@@ -280,15 +289,13 @@ async function computeTrendingScore(postID: string): Promise<number> {
 
 ```typescript
 interface Profile {
-  peerID: string;           // libp2p peer ID
-  displayName?: string;
+  peerID: string;
   bio?: string;
-  bioEmbedding?: number[];  // Semantic vector for bio
-  avatarCID?: string;       // IPFS CID
-  bannerCID?: string;
+  bioEmbedding?: number[];  // Computed: mean(channelEmbeddings)
   channels: ChannelSummary[];
+  followerCount: number;
+  followingCount: number;
   joinedAt: number;
-  signature: Uint8Array;
 }
 
 interface ChannelSummary {
@@ -297,6 +304,7 @@ interface ChannelSummary {
   description: string;
   embedding: number[];
   postCount: number;
+  latestEmbedding: number[];
 }
 ```
 
@@ -305,6 +313,12 @@ interface ChannelSummary {
 Aggregated message of a peer's channel distributions:
 
 ```javascript
+async function computeBioEmbedding(profile: Profile): Promise<number[]> {
+  if (profile.channels.length === 0) return [];
+  const embeddings = profile.channels.map(c => c.latestEmbedding);
+  return meanVector(embeddings);  // Element-wise mean
+}
+
 async function getProfile(peerID: string): Promise<Profile> {
   // Aggregate channel distributions
   const channelsKey = `/isc/profile/channels/${peerID}`;
@@ -316,13 +330,17 @@ async function getProfile(peerID: string): Promise<Profile> {
     ? meanVector(allEmbeddings)
     : undefined;
   
-  return {
+  const profile: Profile = {
     peerID,
     channels: channels.map(decode),
     bioEmbedding,
+    followerCount: 0,
+    followingCount: 0,
     joinedAt: getFirstSeen(peerID),
-    signature: await sign(encode(profile), keypair.privateKey),
   };
+
+  const signature = await sign(encode(profile), keypair.privateKey);
+  return { ...profile, signature };
 }
 ```
 
@@ -555,7 +573,7 @@ function applyChaosMode(embedding: number[], chaosLevel: number): number[] {
 
 | Phase | Target Date | Features |
 |---|---|---|
-| **Q2 2026** | Apr–Jun 2026 | Posts & feeds (short posts, long-form, For You, Following) |
-| **Q3 2026** | Jul–Sep 2026 | Interactions (likes, reposts, replies), DMs |
-| **Q4 2026** | Oct–Dec 2026 | Profiles, communities, Audio Spaces, Lightning tips |
-| **2027** | Jan+ | Chaos mode, thought bridging, AT Protocol interop |
+| **Q1 2027** | Jan–Mar 2027 | Posts & feeds (short posts, long-form, For You, Following) |
+| **Q2 2027** | Apr–Jun 2027 | Interactions (likes, reposts, replies), DMs |
+| **Q3 2027** | Jul–Sep 2027 | Profiles, communities, Audio Spaces, Lightning tips |
+| **Q4 2027** | Oct–Dec 2027 | Chaos mode, thought bridging, AT Protocol interop |

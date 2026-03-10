@@ -4,7 +4,7 @@
 
 A fully decentralized, browser-only social platform that uses in-browser LLM embeddings to place ideas in a shared vector space — then serendipitously connects you with peers whose mental distributions are closest to yours.
 
-**No servers. No accounts. No surveillance. Just thought and conversation.**
+**Minimal servers. No accounts. No surveillance. Just thought and conversation.**
 
 ---
 
@@ -25,7 +25,7 @@ See [PROTOCOL.md](PROTOCOL.md) for complete protocol specification.
 
 | Property | Description |
 |---|---|
-| **Fully browser-native** | Zero server-side compute; all embedding and routing runs in-browser |
+| **Fully browser-native** | Minimal server-side compute; all embedding and routing runs in-browser |
 | **Serverless P2P** | Kademlia DHT for discovery, WebRTC DataChannels for chat |
 | **Channels** | Multiple named presence contexts with optional relational semantics |
 | **Adaptive by device** | Model size, worker concurrency, and matching depth auto-scale to device capability |
@@ -46,11 +46,11 @@ Create a channel with a description of what you're thinking about:
 
 ### 2. Embedding Computed Locally
 
-Your browser runs an LLM embedding model (~4-22 MB depending on device tier) to produce a 384-dimensional vector representing your thoughts.
+Your browser runs an LLM embedding model (4-22 MB depending on device tier) to produce a 384-dimensional vector representing your thoughts.
 
 ### 3. Announce to DHT
 
-The vector is hashed via Locality-Sensitive Hashing (LSH) and announced to the Kademlia DHT with a 5-minute TTL.
+The vector is hashed via Locality-Sensitive Hashing (LSH) and announced to the Kademlia DHT with a tier-dependent TTL.
 
 ### 4. Discover Proximal Peers
 
@@ -107,6 +107,7 @@ A **channel** is a named presence context representing current thoughts:
 ```
 
 Each channel produces a set of **distributions**:
+
 - **Root distribution**: `Embed(description)` → μ_root, σ = channel.spread
 - **Fused distributions**: For each relation, `Embed("description tag object")` → μ_fused, σ_fused
 
@@ -115,6 +116,7 @@ Each channel produces a set of **distributions**:
 Vectors are mapped to DHT keys via **seeded Locality-Sensitive Hashing (LSH)**. See [PROTOCOL.md](PROTOCOL.md#lsh-locality-sensitive-hashing) for the complete LSH specification.
 
 Announcement payload:
+
 ```json
 {
   "peerID": "12D3KooW...",
@@ -145,7 +147,7 @@ for (const key of lshHash(currentSample, channel.id, TIER.numHashes)) {
 }
 ```
 
-Candidates are ranked by relational similarity (threshold ~0.75), top-k displayed.
+Candidates are ranked by relational similarity (filtered out by default below 0.55), top-k displayed.
 
 ### Forming Chats
 
@@ -230,9 +232,9 @@ Clients silently filter candidates with unsupported models. The network self-par
 | **P2P network** | `js-libp2p` (WebSockets + WebRTC, Noise, Yamux) |
 | **DHT** | `@libp2p/kad-dht` |
 | **ANN index** | `usearch` (WASM HNSW) |
-| **Crypto** | Web Crypto API (ed25519) |
+| **Crypto** | Web Crypto API (ed25519) for signing, `libsodium-wrappers` for encryption |
 | **Storage** | localStorage + IndexedDB |
-| **UI** | Vanilla HTML/JS |
+| **UI** | Vanilla HTML/JS (no framework dependencies) |
 
 ---
 
@@ -260,7 +262,18 @@ Clients silently filter candidates with unsupported models. The network self-par
 
 - **Privacy**: No server sees raw text or chat content
 - **Censorship resistance**: No central infrastructure to shut down
-- **Cost**: Zero server-side compute; scales infinitely with users
+- **Infrastructure**:
+  - Bootstrap peers: 5-10 community-run libp2p relays (required)
+  - STUN servers: Public (Google, Cloudflare) — free
+  - TURN servers: Community-run (optional, for hard NATs)
+  - Circuit relays: Community-run (optional, for fallback)
+- **Server-Side Compute**: Minimal — only relay traffic, no application logic.
+- **Cost**: ~$50-200/month for bootstrap peer bandwidth at 10k users.
+- **Scale**: DHT provides O(log n) lookup; practical limits:
+  - Browser memory: ~10k ANN index entries (HNSW)
+  - WebRTC connections: ~50 concurrent per browser
+  - Bootstrap bandwidth: Bottleneck at >100k concurrent users
+  - **Mitigation**: Hierarchical DHT, community relays, federation (Phase 2+)
 
 ---
 
@@ -383,6 +396,7 @@ Development proceeds in phases. See [ROADMAP.md](ROADMAP.md) for the complete ti
 | Document | Purpose |
 |---|---|
 | [**README.md**](README.md) | Complete architectural and protocol overview |
+| [**ACCESSIBILITY.md**](ACCESSIBILITY.md) | Accessibility (WCAG 2.1 AA) specification |
 | [**PROTOCOL.md**](PROTOCOL.md) | P2P networking, DHT, communication protocols |
 | [**SEMANTIC.md**](SEMANTIC.md) | Embedding models, relational matching, semantic geometry |
 | [**DELEGATION.md**](DELEGATION.md) | Supernode architecture and delegation protocol |
@@ -425,7 +439,7 @@ See [SECURITY.md](SECURITY.md#security-review-checklist) for full checklist.
 - **GitHub**: [github.com/yourname/isc](https://github.com/yourname/isc)
 - **Issues**: Report bugs and feature requests
 - **Discussions**: Share ideas and experiments
-- **Security**: Report vulnerabilities via security@isc.example
+- **Security**: Report vulnerabilities via <security@isc.example>
 
 ---
 

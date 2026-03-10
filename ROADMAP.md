@@ -36,8 +36,10 @@ ISC is being developed in phases, starting with core reliability in trusted netw
 | Metric | Target |
 |---|---|
 | Concurrent users | 50+ |
-| Connection failure rate | <5% |
-| Median time-to-first-match | <10s |
+| Connection failure rate | <15% |
+| Time-to-first-match (High tier) | <15s |
+| Time-to-first-match (Low tier) | <30s |
+| Delegation avg latency | <1000ms |
 
 ### Timeline
 
@@ -108,7 +110,7 @@ ISC is being developed in phases, starting with core reliability in trusted netw
 | Video calls (WebRTC, parity with X) | 🔲 | P1 |
 | Chaos mode — random perturbation for serendipity | 🔲 | P2 |
 | Crypto tipping / Lightning Network (opt-in) | 🔲 | P2 |
-| ZK proximity proofs — prove sim > threshold without revealing vector | 🔲 | P3 |
+| Optional vector reveal — user can consent to reveal vector for enhanced matching | 🔲 | P3 |
 
 ### Success Criteria
 
@@ -116,7 +118,7 @@ ISC is being developed in phases, starting with core reliability in trusted netw
 |---|---|
 | Daily active users (DAU) | 10,000+ |
 | Critical error rate | <1% |
-| Supernode economics | Tips cover infrastructure for 20% of supernodes |
+| Supernode economics | Tips cover infrastructure for 5% of supernodes |
 
 ### Timeline
 
@@ -143,6 +145,7 @@ ISC is being developed in phases, starting with core reliability in trusted netw
 | Mobile native apps (React Native / Flutter) | 🔲 | P1 |
 | Advanced moderation tools (community courts) | 🔲 | P2 |
 | DAO governance for protocol upgrades | 🔲 | P2 |
+| ZK proximity proofs — prove sim > threshold without revealing vector | 🔲 | P3 |
 | Enterprise deployment options (private instances) | 🔲 | P3 |
 
 ### Success Criteria
@@ -263,6 +266,63 @@ Rate limits enforced at client and supernode level. See [PROTOCOL.md](PROTOCOL.m
 - Multisig signing for model registry
 - Reputation-weighted voting
 - Transparent treasury management
+
+### Economic Sustainability
+
+**Development Costs** (annual):
+
+- 3 developers × $100k = $300k
+- Infrastructure (bootstrap, TURN) = $10k
+- Legal, accounting, compliance = $40k
+- Total: ~$350k/year
+
+**Tip Volume Projection** (based on Nostr, Mastodon):
+
+- Conversion rate: 2-5% of users tip
+- Average tip: $5-10/month
+- At 10k DAU: 200-500 tippers × $7.50 = $1.5k-3.75k/month
+- Coverage: <5% of development costs
+
+**Alternative Revenue**:
+
+1. **Grants**: Protocol Labs, Ethereum Foundation, Mozilla ($50-200k/year)
+2. **Enterprise Support**: Private deployments, SLA ($100-500k/year)
+3. **Donations**: GitHub Sponsors, Open Collective ($10-50k/year)
+4. **Supernode Hosting**: Managed supernode service ($5-20/month, 100 users = $6-24k/year)
+
+**Phase 1-2 Strategy**: Grants + donations (community-funded)
+**Phase 3+ Strategy**: Enterprise support + managed services (self-sustaining)
+
+### Supernode Economics
+
+**Supernode Costs** (per month):
+
+- Bandwidth: 50 Mbps up × 24/7 × $0.01/GB = ~$150/month
+- Compute: 8-core server = ~$100/month
+- Total: ~$250/month per supernode
+
+**Tip Distribution**:
+
+- 100% of tips go to supernode operators
+- Platform takes 0% cut (Phase 1-3)
+- Distribution: Proportional to uptime + requests served
+
+**Sustainability Analysis**:
+
+- At 10k DAU, 2% tip rate, $7.50 avg tip: $1.5k/month total
+- Supports: $1.5k / $250 = 6 supernodes (3% of 200 supernodes)
+- Gap: Tips cover 3%, not 20%
+
+**Revised Target**:
+
+- Phase 3: Tips cover 5% of supernode costs (realistic)
+- Phase 4+: Enterprise support covers 50%+ of costs
+
+**Alternative Incentives** (non-monetary):
+
+- Reputation badges ("Trusted Supernode")
+- Priority support (faster delegation responses)
+- Governance rights (protocol upgrade voting)
 
 ---
 

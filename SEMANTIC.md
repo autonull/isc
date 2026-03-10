@@ -32,6 +32,7 @@ A fixed set of 10 predefined relation tags ensures network-wide interoperability
 | `boosted_by` | Amplification or modulation | `community feedback → improved models` |
 
 **Rules**:
+
 - Max 5 relations per channel (UI-enforced)
 - Tags must come from the ontology above
 - Objects are free-form text or structured strings for spatiotemporal relations
@@ -203,10 +204,10 @@ All models are available via `@xenova/transformers.js` / ONNX-WASM:
 
 | Model (Xenova ID) | Dims | Size | Tier | Notes |
 |---|---|---|---|---|
-| `all-MiniLM-L6-v2` | 384 | ~22 MB | **High (default)** | Best balance of speed, quality, consistency |
-| `bge-small-en-v1.5` | 384 | ~18 MB | High (alt) | Top retrieval benchmarks |
-| `paraphrase-MiniLM-L3-v3` | 384 | ~8 MB | **Mid** | Lighter, aligned with MiniLM family |
-| `gte-tiny` | 384 | ~4 MB | **Low** | Minimal compute fallback |
+| `all-MiniLM-L6-v2` | 384 | 22 MB | **High (default)** | Best balance of speed, quality, consistency |
+| `bge-small-en-v1.5` | 384 | 18 MB | High (alt) | Top retrieval benchmarks |
+| `paraphrase-MiniLM-L3-v3` | 384 | 8 MB | **Mid** | Lighter, aligned with MiniLM family |
+| `gte-tiny` | 384 | 4 MB | **Low** | Minimal compute fallback |
 | Word-hash fallback | — | 0 MB | **Minimal** | No model; Hamming distance |
 
 ### Word-Hash Fallback Specification
@@ -251,6 +252,7 @@ Embedding spaces from different models are not directly comparable, even at iden
 ### Solution
 
 1. **Announcement field**: Every DHT entry includes model version with hash:
+
    ```json
    "model": "Xenova/all-MiniLM-L6-v2 @sha256:abc123def456"
    ```
@@ -264,6 +266,7 @@ Embedding spaces from different models are not directly comparable, even at iden
    - Clients show migration prompt when >50% of matches use newer model
 
 4. **Community model registry**: A signed, DHT-hosted manifest lists approved model versions:
+
    ```json
    {
      "type": "model_registry",
@@ -307,7 +310,7 @@ ISC uses **approximate, ranked matching** — not discrete rooms:
 
 ### Similarity Thresholds
 
-Configurable thresholds (default ~0.7 similarity):
+Configurable thresholds:
 
 | Range | Label | UI Treatment |
 |---|---|---|
@@ -339,6 +342,7 @@ function cosineSimilarity(a: number[], b: number[]): number {
 ```
 
 **Properties**:
+
 - Range: [-1, 1] (1 = identical direction, 0 = orthogonal, -1 = opposite)
 - Invariant to vector magnitude (only direction matters)
 - Standard metric for embedding similarity
@@ -411,6 +415,17 @@ function parseLocation(dist: Distribution): Location {
   };
 }
 
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
 function locationOverlap(a: Location, b: Location): number {
   const distance = haversineDistance(a.lat, a.long, b.lat, b.long);
   const maxRadius = Math.max(a.radius, b.radius);
@@ -440,6 +455,6 @@ function timeOverlap(a: TimeWindow, b: TimeWindow): number {
                          - Math.max(a.start.getTime(), b.start.getTime()));
   const total = Math.max(a.end.getTime(), b.end.getTime()) 
               - Math.min(a.start.getTime(), b.start.getTime());
-  return overlap / total;
+  return total > 0 ? overlap / total : 0;
 }
 ```

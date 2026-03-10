@@ -57,6 +57,7 @@ Layers 0–2 ship in Phase 1. Layers 3–5 grow progressively through Phases 2�
 See [PROTOCOL.md](PROTOCOL.md#rate-limits) for the complete rate limit specification.
 
 Test verification:
+
 - DHT Announce: 5/min per peer
 - Delegation Request: 3/min per peer
 - Delegation Response: 10 concurrent per supernode
@@ -150,6 +151,8 @@ Zero-dependency, run instantly, form the immune system for the matching core.
 | Hash length | Any input | Output exactly 32 chars per hash |
 | Relation prefix | `"in_location:<hash>"` | Prefix correctly prepended |
 | Bucket distribution | 10,000 random vectors | Uniform distribution across hash space (χ² test p > 0.05) |
+| Dot-product projection | Fixed input vector and seed | Bit string correctly reflects the sign of the dot product (mathematically verified) |
+| Multiple Hashes | Multiple hashes requested | Function returns an array of unique string hashes of correct length |
 
 #### Relational Matching Scorer
 
@@ -378,6 +381,7 @@ class NetworkSim {
 ```
 
 **Virtual Time Semantics**:
+
 - Time dilation: 1 real second = 1000 virtual seconds (configurable)
 - Async operations: Model inference = 100ms virtual; Network request = 50-500ms virtual (configurable distribution)
 - All async operations use `SimClock.setTimeout()` for deterministic replay
@@ -428,6 +432,7 @@ Expected: Intra-mood score > cross-mood score on average.
 ### 2.3 Reputation System Simulation
 
 **Reputation Definition**: Score in [0, 1] computed from:
+
 - Base score: 0.5 for all new peers
 - Positive votes: +0.01 per successful chat (capped at +0.4)
 - Negative votes: -0.05 per mute/report (capped at -0.5)
@@ -460,6 +465,7 @@ Expected: Intra-mood score > cross-mood score on average.
 Simulate the 90-day dual-announcement migration window.
 
 **Migration Protocol**:
+
 - Days 0-90: Peers announce both v1 and v2 vectors (dual-announce)
 - Days 91+: v1 TTLs expire; v1-only peers isolated in compatibility shard
 
@@ -764,6 +770,7 @@ tests/
 ### Observability Requirements
 
 **Structured Logging Format**:
+
 ```json
 {
   "timestamp": "2026-03-09T12:34:56.789Z",
@@ -778,6 +785,7 @@ tests/
 ```
 
 **Metrics Export**: Prometheus-compatible endpoints for:
+
 - `isc_delegation_latency_seconds` (histogram)
 - `isc_match_quality_score` (histogram)
 - `isc_dht_operations_total` (counter)
@@ -788,17 +796,20 @@ tests/
 ### Test Data Management
 
 **Reproducible Peer IDs**:
+
 ```javascript
 // Generate deterministic peer IDs for fixtures
 const peerId = await generatePeerId(seed: number);
 ```
 
 **Key Rotation**:
+
 - Test keypairs rotated weekly via CI
 - Old keypairs archived in `tests/fixtures/keypairs/archive/`
 - Never reuse production key formats in tests
 
 **Log Retention**:
+
 - Simulation logs: 90 days
 - CI test logs: 30 days
 - Performance regression data: 1 year
@@ -1054,6 +1065,7 @@ The test framework design has identified the following gaps and ambiguities in `
 **Phase 2+ (Real P2P)**: Trace ID propagation across WebRTC connections deferred pending libp2p custom protocol implementation.
 
 **Format**:
+
 ```json
 {
   "traceId": "abc123def456...",  // 128-bit UUID
@@ -1066,12 +1078,12 @@ The test framework design has identified the following gaps and ambiguities in `
 
 ## Immediate Next Steps (Week 1)
 
-1.  **Initialize Vitest Suite:** Set up unit tests for `computeRelationalDistributions` and `lshHash`.
-2.  **Build "Peer-in-a-Box":** Create a Node.js script that instantiates a libp2p node + embedding model without the UI, allowing rapid scripting of peer interactions.
-3.  **Model Hash Locking:** Implement the `model_version` check in the DHT announcement logic to prevent accidental cross-model matching during development.
-4.  **Security Baseline:** Run a static analysis scan on the Web Crypto API usage to ensure key storage is secure in IndexedDB.
-5.  **Create `sim-2-peers.spec.js`:** A Playwright script that opens two incognito contexts, navigates to `localhost:8080`, inputs similar text, and asserts a match appears on both screens.
-6.  **Create Ground Truth Fixtures:** Generate pre-computed embeddings for 50 canonical test phrases with known similarity scores.
+1. **Initialize Vitest Suite:** Set up unit tests for `computeRelationalDistributions` and `lshHash`.
+2. **Build "Peer-in-a-Box":** Create a Node.js script that instantiates a libp2p node + embedding model without the UI, allowing rapid scripting of peer interactions.
+3. **Model Hash Locking:** Implement the `model_version` check in the DHT announcement logic to prevent accidental cross-model matching during development.
+4. **Security Baseline:** Run a static analysis scan on the Web Crypto API usage to ensure key storage is secure in IndexedDB.
+5. **Create `sim-2-peers.spec.js`:** A Playwright script that opens two incognito contexts, navigates to `localhost:8080`, inputs similar text, and asserts a match appears on both screens.
+6. **Create Ground Truth Fixtures:** Generate pre-computed embeddings for 50 canonical test phrases with known similarity scores.
 
 ---
 
