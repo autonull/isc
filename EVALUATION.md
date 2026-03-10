@@ -1,4 +1,4 @@
-# ISC System Feasibility Evaluation
+# ISC System Feasibility & Utility Evaluation
 
 ## 1. Architectural Gaps & Network Realities
 
@@ -122,6 +122,35 @@
   entirely. ISC now uses the native Web Crypto API exclusively, employing
   Ed25519 strictly for signing and utilizing distinct ECDH/AES-GCM keys for E2E
   encryption, avoiding hazardous key-type conversions entirely.
+
+## 4. Utility & Value Proposition
+
+### Cross-Topic Serendipity (Anti-Echo Chamber)
+
+By routing based on the high-dimensional geometric proximity of thought vectors
+rather than discrete, human-labeled hashtags or server rooms, ISC possesses
+immense utility in bridging intellectual silos. Users discussing "AI
+consciousness" and "biological neuroplasticity" may map to the same
+mathematical bucket without ever using the same vocabulary, forging high-value,
+serendipitous connections that traditional graph-based social networks are
+structurally incapable of producing.
+
+### Fluid & Ephemeral Identity
+
+Traditional platforms force users to curate a static, monolithic profile that
+flattens human complexity. ISC models identity as a fluid set of probabilistic
+distributions (Channels) that shift as the user's focus shifts. This reduces
+performance anxiety, encourages exploration of niche interests without
+reputational lock-in, and structurally aligns the software with the natural
+dynamism of human thought.
+
+### Sovereignty & Surveillance Resistance
+
+The combination of E2E WebRTC encryption, offline Mailbox relays, and pure
+Web Crypto primitives guarantees that no central authority can data-mine
+conversations or unilaterally deplatform participants. This provides immense
+utility to activists, researchers, and marginalized groups seeking safe,
+censorship-resistant digital assembly.
 
 ## Conclusion
 
