@@ -1,8 +1,6 @@
 # ISC Protocol Specification
 
 > **Purpose**: Detailed P2P networking, DHT, and communication protocol specifications.
->
-> For an overview, see [README.md](README.md#protocol-specifications).
 
 ---
 
@@ -16,6 +14,43 @@ const PROTOCOL_POST = '/isc/post/1.0';
 const PROTOCOL_FOLLOW = '/isc/follow/1.0';
 const PROTOCOL_DM = '/isc/dm/1.0';
 ```
+
+---
+
+## Device Tiers
+
+ISC adapts protocol behavior based on device capability:
+
+| Tier | Target | Model | Relations | ANN | Delegation |
+|------|--------|-------|-----------|-----|------------|
+| **High** | Desktop/laptop | `all-MiniLM-L6-v2` (22 MB) | All (max 5) | HNSW | Can serve |
+| **Mid** | Mid-range phone | `paraphrase-MiniLM-L3-v3` (8 MB) | Root + 2 | HNSW lite | Limited serve |
+| **Low** | Budget phone | `gte-tiny` (4 MB) | Root only | Linear scan | Can request |
+| **Minimal** | Constrained | Word-hash fallback | Root only | Hamming | Can request |
+
+### Tier Detection
+
+```javascript
+async function detectTier() {
+  const cores = navigator.hardwareConcurrency ?? 2;
+  const mem = navigator.deviceMemory ?? 1;
+  const conn = navigator.connection?.effectiveType ?? '4g';
+
+  if (cores >= 4 && mem >= 4 && conn !== '2g') return 'high';
+  if (cores >= 2 && mem >= 2) return 'mid';
+  if (conn === '2g' || mem < 1) return 'minimal';
+  return 'low';
+}
+```
+
+### Tier-Specific Protocol Parameters
+
+| Tier | numHashes | candidateCap | refreshInterval |
+|------|-----------|--------------|-----------------|
+| High | 20 | 100 | 5 min |
+| Mid | 12 | 50 | 8 min |
+| Low | 8 | 20 | 15 min |
+| Minimal | 6 | 10 | 20 min |
 
 ---
 
@@ -56,6 +91,32 @@ await node.start();
 ---
 
 ## DHT Protocol
+
+### Channel Schema
+
+```typescript
+interface Channel {
+  id: string;
+  name: string;
+  description: string;
+  spread: number;           // 0.0-1.0, distribution fuzziness
+  relations: Relation[];    // max 5
+  createdAt: number;
+  updatedAt: number;
+}
+
+interface Relation {
+  tag: string;              // From ontology below
+  object: string;           // Free-form or structured
+  weight?: number;          // Default 1.0
+}
+```
+
+### Relation Ontology
+
+See [SEMANTIC.md](SEMANTIC.md#relation-ontology) for the complete relation ontology with examples and rules.
+
+**Tags:** `in_location`, `during_time`, `with_mood`, `under_domain`, `causes_effect`, `part_of`, `similar_to`, `opposed_to`, `requires`, `boosted_by`
 
 ### Key Schema
 
@@ -263,47 +324,7 @@ See [DELEGATION.md](DELEGATION.md) for the complete specification including requ
 
 ## Social Layer Protocol
 
-See [SOCIAL.md](SOCIAL.md) for the complete specification.
-
-**Protocols**: `/isc/post/1.0`, `/isc/follow/1.0`, `/isc/reaction/1.0`, `/isc/dm/1.0`
-
-```typescript
-interface SignedPost {
-  type: 'post';
-  postID: string;
-  author: string;
-  content: string;
-  embedding: number[];
-  timestamp: number;
-  signature: Uint8Array;
-  ttl: number;
-}
-
-interface FollowEvent {
-  type: 'follow' | 'unfollow';
-  follower: string;
-  followee: string;
-  timestamp: number;
-  signature: Uint8Array;
-}
-
-interface LikeEvent {
-  type: 'like';
-  reactor: string;
-  targetPostID: string;
-  timestamp: number;
-  signature: Uint8Array;
-}
-
-interface DirectMessage {
-  type: 'dm';
-  sender: string;
-  recipient: string;
-  encrypted: Uint8Array;
-  timestamp: number;
-  signature: Uint8Array;
-}
-```
+See [SOCIAL.md](SOCIAL.md) for complete social layer protocol specification.
 
 ---
 
@@ -371,6 +392,15 @@ Clients only query shards matching their loaded model.
 
 ## Error Handling
 
+### Matching Thresholds
+
+| Range | Label | Protocol Behavior |
+|---|---|---|
+| 0.85+ | Very Close | Auto-dial enabled |
+| 0.70–0.85 | Nearby | Standard candidate |
+| 0.55–0.70 | Orbiting | Manual dial required |
+| <0.55 | Distant | Filtered out |
+
 ### Stream Errors
 
 ```typescript
@@ -437,7 +467,47 @@ function decode(data: Uint8Array): any {
 }
 ```
 
-Fallback: JSON for debugging and human-readable logs.
+Fallback: JSON for debugging.
+
+---
+
+## Bootstrap Peers
+
+Default public libp2p relays:
+
+```
+/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SznbYGzPwpkqDrqEf
+/ip4/104.131.131.82/tcp/4001/p2p/QmSoLju6m7xTh3DuokvT5887gRqQofnZ6Gqiq5KhCvv6ip
+```
+
+---
+
+## Testing
+
+### Local Supernode Testing
+
+```bash
+# Terminal 1: Supernode
+npx serve . --port 8080
+# Open http://localhost:8080?tier=high&supernode=true
+
+# Terminal 2: Low-tier client
+npx serve . --port 8081
+# Open http://localhost:8081?tier=low&delegate=true
+```
+
+Verify in DevTools:
+- Console: `peer.delegation.stats`
+- Network: Encrypted messages on `/isc/delegate/1.0`
+- Match forms within 30 seconds
+
+### Debug Logging
+
+```
+Settings → Developer → Enable Debug Logging
+```
+
+Outputs: DHT announcements, match queries, delegation, WebRTC events.
 
 ---
 

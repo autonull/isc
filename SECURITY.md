@@ -49,51 +49,11 @@ await storage.set('keypair', {
 
 ### Signed Announcements
 
-Every DHT announcement is signed:
-
-```typescript
-interface SignedAnnouncement {
-  peerID: string;
-  channelID: string;
-  model: string;
-  vec: number[];
-  relTag?: string;
-  ttl: number;
-  updatedAt: number;
-  signature: Uint8Array;  // ed25519 signature
-}
-
-// Verification
-async function verifyAnnouncement(ann: SignedAnnouncement): Promise<boolean> {
-  const payload = encode({
-    peerID: ann.peerID,
-    channelID: ann.channelID,
-    model: ann.model,
-    vec: ann.vec,
-    relTag: ann.relTag,
-    ttl: ann.ttl,
-    updatedAt: ann.updatedAt,
-  });
-  return verify(payload, ann.signature, getPublicKey(ann.peerID));
-}
-```
+Every DHT announcement is signed. See [PROTOCOL.md](PROTOCOL.md#announcement-payload) for the complete `SignedAnnouncement` interface.
 
 ### Signed Posts
 
-All social-layer content carries signatures:
-
-```typescript
-interface SignedPost {
-  type: 'post';
-  postID: string;
-  author: string;
-  content: string;
-  timestamp: number;
-  signature: Uint8Array;
-}
-
-// Tamperproof by design; no central authority required
-```
+All social-layer content carries signatures. See [SOCIAL.md](SOCIAL.md#post-schema) for the complete `SignedPost` interface.
 
 ---
 
@@ -127,20 +87,9 @@ Rate limits prevent spam and abuse. See [PROTOCOL.md](PROTOCOL.md#rate-limits) f
 
 ### Mute / Block Lists
 
-```typescript
-interface MuteEvent {
-  type: 'mute';
-  muter: string;      // peerID
-  muted: string;      // peerID
-  reason?: string;
-  timestamp: number;
-  signature: Uint8Array;
-}
+See [PROTOCOL.md](PROTOCOL.md#moderation-protocol) for the `MuteEvent` interface.
 
-// Stored in DHT at: /isc/mute/<peerID>
-// Clients fetch and cache muted peers locally
-// Auto-filter flagged peers from match results
-```
+Signed mute events stored in DHT at `/isc/mute/<peerID>`. Clients fetch and cache muted peers locally. Auto-filter flagged peers from match results.
 
 ### Semantic Filters
 
@@ -160,19 +109,9 @@ interface MuteEvent {
 
 ### Reputation Weighting
 
-```typescript
-interface ReputationScore {
-  peerID: string;
-  score: number;       // 0.0 - 1.0
-  interactions: number;
-  halfLifeDays: number; // 30-day decay
-  lastUpdated: number;
-}
+See [SOCIAL.md](SOCIAL.md#web-of-trust) for the `ReputationScore` interface.
 
-// Peers accumulate reputation via successful interactions
-// Low-rep announcements deprioritized in ANN results
-// Reputation decays with 30-day half-life
-```
+Peers accumulate reputation via successful interactions. Low-rep announcements deprioritized in ANN results. Reputation decays with 30-day half-life.
 
 **Sybil resistance**:
 - Mutual signing requirement (both parties confirm interaction)
@@ -181,19 +120,9 @@ interface ReputationScore {
 
 ### Stake-Based Signaling (Opt-In)
 
-```typescript
-interface StakeProof {
-  peerID: string;
-  amount: number;      // Satoshis locked
-  lockTx: string;      // Lightning transaction ID
-  expiry: number;
-  signature: Uint8Array;
-}
+See [SOCIAL.md](SOCIAL.md) for complete stake-based signaling specification.
 
-// Users may lock Lightning satoshis as sybil-resistance signal
-// Slashed on verified abuse
-// Never required for basic use
-```
+Users may lock Lightning satoshis as sybil-resistance signal. Slashed on verified abuse. Never required for basic use.
 
 ### Semantic Coherence Checks
 
@@ -211,22 +140,9 @@ function checkCoherence(announcement: SignedAnnouncement): boolean {
 
 ### Decentralized Moderation
 
-```typescript
-interface ReportEvent {
-  type: 'report';
-  reporter: string;
-  reported: string;
-  targetPostID?: string;
-  reason: 'spam' | 'harassment' | 'impersonation' | 'other';
-  description: string;
-  timestamp: number;
-  signature: Uint8Array;
-}
+See [PROTOCOL.md](PROTOCOL.md#moderation-protocol) for the `ReportEvent` and `MuteEvent` interfaces.
 
-// Signed reports stored in DHT
-// Clients weight reports by reporter reputation
-// No central moderation team; safety emerges from network geometry
-```
+Signed reports stored in DHT. Clients weight reports by reporter reputation. No central moderation team; safety emerges from network geometry.
 
 ---
 

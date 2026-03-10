@@ -72,11 +72,8 @@ export function generateKeypair(): Promise<Keypair>;
 export function sign(payload: Uint8Array, keypair: Keypair): Promise<Signature>;
 export function verify(payload: Uint8Array, signature: Signature, publicKey: PublicKey): Promise<boolean>;
 
-// Types
-export interface Channel { id: string; description: string; relations: Relation[]; spread: number; }
-export interface Distribution { type: 'root' | 'fused'; tag?: string; mu: number[]; sigma: number; weight?: number; }
-export interface Relation { tag: string; object: string; weight?: number; }
-export interface Keypair { publicKey: PublicKey; privateKey: PrivateKey; }
+// Types - see PROTOCOL.md for interface definitions
+export type { Channel, Distribution, Relation, Keypair };
 ```
 
 **Dependencies**: None (pure JS/TS only)
@@ -202,10 +199,8 @@ export const PROTOCOL_CHAT = '/isc/chat/1.0';
 export const PROTOCOL_DELEGATE = '/isc/delegate/1.0';
 export const PROTOCOL_ANNOUNCE = '/isc/announce/1.0';
 
-// Message types
-export interface ChatMessage { channelID: string; msg: string; timestamp: number; }
-export interface DelegateRequest { requestID: string; service: string; payload: Uint8Array; }
-export interface DelegateResponse { requestID: string; result: Uint8Array; signature: Signature; }
+// Message types - see PROTOCOL.md for interface definitions
+export type { ChatMessage, DelegateRequest, DelegateResponse };
 
 // Protocol handlers
 export function createChatHandler(stream: Stream): ChatProtocol;

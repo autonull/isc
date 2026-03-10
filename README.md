@@ -17,7 +17,7 @@ npx serve .
 # Open http://localhost:8080 in two browser tabs
 ```
 
-See [GETTING_STARTED.md](GETTING_STARTED.md) for detailed setup instructions.
+See [PROTOCOL.md](PROTOCOL.md) for complete protocol specification.
 
 ---
 
@@ -188,7 +188,7 @@ ISC supports progressive decentralization:
 
 ## Device Tiers
 
-ISC adapts to device capability at startup. See [GETTING_STARTED.md](GETTING_STARTED.md#device-tier-detection) for the complete tier specification.
+ISC adapts to device capability at startup. See [PROTOCOL.md](PROTOCOL.md#device-tiers) for the complete tier specification.
 
 **Tiers:** High (desktop), Mid (mid-range phone), Low (budget phone), Minimal (constrained)
 
@@ -360,7 +360,7 @@ Protocol constants, message formats, DHT key schemas, and rate limits are define
 
 ## Modular Architecture
 
-ISC uses a monorepo structure to maximize code sharing across form factors. See [MONOREPO.md](MONOREPO.md) for the complete architecture specification.
+ISC uses a monorepo structure to maximize code sharing across form factors. See [CODE.md](CODE.md) for the complete architecture specification.
 
 **Packages:** `@isc/core` (environment-agnostic), `@isc/adapters` (browser/node/cli), `@isc/protocol` (libp2p handlers), `@isc/apps/*` (form factors)
 
@@ -382,17 +382,16 @@ Development proceeds in phases. See [ROADMAP.md](ROADMAP.md) for the complete ti
 
 | Document | Purpose |
 |---|---|
-| [**README.md**](README.md) | This file — complete architectural and protocol overview |
+| [**README.md**](README.md) | Complete architectural and protocol overview |
 | [**PROTOCOL.md**](PROTOCOL.md) | P2P networking, DHT, communication protocols |
 | [**SEMANTIC.md**](SEMANTIC.md) | Embedding models, relational matching, semantic geometry |
 | [**DELEGATION.md**](DELEGATION.md) | Supernode architecture and delegation protocol |
 | [**SECURITY.md**](SECURITY.md) | Threat model, safety, privacy, authenticity |
 | [**SOCIAL.md**](SOCIAL.md) | Social network layer (posts, feeds, communities) |
-| [**MONOREPO.md**](MONOREPO.md) | Modular architecture and package structure |
-| [**GETTING_STARTED.md**](GETTING_STARTED.md) | Setup, usage, and local testing |
+| [**CODE.md**](CODE.md) | Modular architecture and package structure |
 | [**ROADMAP.md**](ROADMAP.md) | Development phases and timeline |
-| [**test.md**](test.md) | Test specifications (unchanged) |
-| [**ui.md**](ui.md) | UI specifications (unchanged) |
+| [**test.md**](test.md) | Test specifications |
+| [**ui.md**](ui.md) | UI specifications |
 
 ---
 
