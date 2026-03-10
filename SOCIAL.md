@@ -474,7 +474,7 @@ interface DirectMessage {
   encrypted: Uint8Array;  // E2E encrypted payload
 }
 
-// 1:1 or group WebRTC streams, E2E encrypted via libsodium
+// 1:1 or group WebRTC streams, E2E encrypted via ECDH/AES-GCM (Web Crypto API)
 async function sendDM(recipient: string, content: string): Promise<DirectMessage> {
   const encrypted = await encrypt(content, recipientPublicKey);
   

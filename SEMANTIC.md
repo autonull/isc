@@ -259,7 +259,6 @@ Embedding spaces from different models are not directly comparable, even at iden
 3. **Graceful migration (Model Bridging)**: When a new canonical model is adopted:
    - Old-model peers continue operating in a "compatibility shard" (separate LSH bucket prefixes).
    - High-tier Supernodes automatically offer a `/isc/delegate/1.0:translate_embedding` service. When an old-model peer queries the network, the supernode translates the query into the new model space (either by running the text through the new model, or via a pre-trained mapping projection matrix), enabling cross-shard discovery during the transition period.
-   - Dual-announcement mode (optional, High-tier only) allows peers to announce in both old and new spaces for 90 days.
    - After 90 days, old-model announcements expire naturally via TTL.
 
 4. **Community model registry**: A signed, DHT-hosted manifest lists approved model versions:
