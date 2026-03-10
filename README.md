@@ -135,7 +135,7 @@ Clients query DHT for candidates with matching LSH keys within the same model's 
 
 ```javascript
 const candidates = [];
-for (const key of lshHash(currentSample, modelHash, TIER.numHashes)) {
+for (const key of lshHash(currentSample, modelHash, TIER.baseHashes)) {
   const values = await node.contentRouting.getMany(key, { count: TIER.candidateCap });
   for (const v of values) {
     const peer = JSON.parse(v);

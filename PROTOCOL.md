@@ -139,9 +139,9 @@ All DHT keys are prefixed by type for namespace isolation. This serves as the si
 
 > **Note**: Routing uses the `modelHash` (e.g., `abc123def456` for `all-MiniLM-L6-v2`) rather than `channelID` to ensure that identical thoughts in completely different channels naturally map to the same DHT space, enabling cross-topic serendipity.
 
-### LSH (Locality-Sensitive Hashing)
+### Multi-Probe LSH (Locality-Sensitive Hashing)
 
-Vectors are mapped to DHT keys via seeded random-projection LSH:
+Vectors are mapped to DHT keys via seeded random-projection LSH. To increase recall without amplifying DHT write traffic, ISC uses **Multi-Probe LSH**: clients write to a small number of base buckets, but when querying, they probe mathematically adjacent buckets (e.g., flipping 1 bit).
 
 ```javascript
 function seededRng(seed: string): () => number {
@@ -158,12 +158,13 @@ function seededRng(seed: string): () => number {
   };
 }
 
-function lshHash(vec: number[], seed: string, numHashes: number = 20, hashLen: number = 32): string[] {
+function lshHash(vec: number[], seed: string, baseHashes: number = 4, hashLen: number = 32, enableMultiProbe: boolean = true): string[] {
   const rng = seededRng(seed);
   const hashes: string[] = [];
 
-  for (let i = 0; i < numHashes; i++) {
+  for (let i = 0; i < baseHashes; i++) {
     let hashBits = '';
+    const dotProducts: number[] = [];
 
     // Each hash requires hashLen projections
     for (let h = 0; h < hashLen; h++) {
@@ -176,11 +177,24 @@ function lshHash(vec: number[], seed: string, numHashes: number = 20, hashLen: n
         dotProduct += vec[j] * proj[j];
       }
 
+      dotProducts.push(dotProduct);
       // 1 if positive, 0 if negative
       hashBits += dotProduct > 0 ? '1' : '0';
     }
 
     hashes.push(hashBits);
+
+    // Generate adjacent probes by flipping the bit of the projection closest to 0
+    if (enableMultiProbe) {
+      let minIdx = 0;
+      for (let h = 1; h < hashLen; h++) {
+        if (Math.abs(dotProducts[h]) < Math.abs(dotProducts[minIdx])) {
+          minIdx = h;
+        }
+      }
+      const flippedBits = hashBits.substring(0, minIdx) + (hashBits[minIdx] === '1' ? '0' : '1') + hashBits.substring(minIdx + 1);
+      hashes.push(flippedBits);
+    }
   }
 
   return hashes;
@@ -189,12 +203,12 @@ function lshHash(vec: number[], seed: string, numHashes: number = 20, hashLen: n
 
 **Tier-specific parameters:**
 
-| Tier | numHashes | candidateCap |
-|------|-----------|--------------|
-| High | 20 | 100 |
-| Mid | 12 | 50 |
-| Low | 8 | 20 |
-| Minimal | 6 | 10 |
+| Tier | baseHashes | candidateCap |
+|------|------------|--------------|
+| High | 4 | 100 |
+| Mid | 3 | 50 |
+| Low | 2 | 20 |
+| Minimal | 1 | 10 |
 
 ### Announcement Payload
 
@@ -215,7 +229,7 @@ interface SignedAnnouncement {
 
 ```javascript
 async function announceChannel(channel: Channel, dists: Distribution[], modelHash: string) {
-  const hashes = lshHash(dists[0].mu, modelHash, TIER.numHashes);
+  const hashes = lshHash(dists[0].mu, modelHash, TIER.baseHashes);
   
   for (let i = 0; i < Math.min(hashes.length, dists.length); i++) {
     const payload: SignedAnnouncement = {
