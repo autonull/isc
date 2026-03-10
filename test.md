@@ -144,8 +144,8 @@ Zero-dependency, run instantly, form the immune system for the matching core.
 
 | Test | Scenario | Expected |
 |------|----------|----------|
-| Determinism | Same `(vec, channelId)` called twice | Identical hash string |
-| Channel isolation | Same vec, different `channelId` | Different hash (seeded RNG diverges) |
+| Determinism | Same `(vec, seed)` called twice | Identical hash string |
+| Semantic space isolation | Same vec, different `modelHash` (seed) | Different hash (seeded RNG diverges) |
 | Bucket proximity | Two similar vectors (cosine > 0.9) | Collision rate ≥ 0.7 across 20 hashes (95% CI) |
 | Dissimilar vectors | Cosine ≈ 0.1 | Collision rate ≤ 0.2 across 20 hashes (95% CI) |
 | Hash length | Any input | Output exactly 32 chars per hash |

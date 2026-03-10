@@ -113,7 +113,7 @@ Each channel produces a set of **distributions**:
 
 ### DHT Announcement
 
-Vectors are mapped to DHT keys via **seeded Locality-Sensitive Hashing (LSH)**. See [PROTOCOL.md](PROTOCOL.md#lsh-locality-sensitive-hashing) for the complete LSH specification.
+Vectors are mapped to DHT keys via **seeded Locality-Sensitive Hashing (LSH)** using the embedding model hash to ensure global semantic routing. See [PROTOCOL.md](PROTOCOL.md#lsh-locality-sensitive-hashing) for the complete LSH specification.
 
 Announcement payload:
 
@@ -131,11 +131,11 @@ Announcement payload:
 
 ### Querying for Proximals
 
-Clients query DHT for candidates with matching LSH keys, then refine locally:
+Clients query DHT for candidates with matching LSH keys within the same model's embedding space, then refine locally:
 
 ```javascript
 const candidates = [];
-for (const key of lshHash(currentSample, channel.id, TIER.numHashes)) {
+for (const key of lshHash(currentSample, modelHash, TIER.numHashes)) {
   const values = await node.contentRouting.getMany(key, { count: TIER.candidateCap });
   for (const v of values) {
     const peer = JSON.parse(v);

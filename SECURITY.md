@@ -83,9 +83,7 @@ ISC supports three deployment modes with different safety assumptions. See [READ
 
 ### Rate Limiting
 
-Rate limits prevent spam and abuse. See [PROTOCOL.md](PROTOCOL.md#rate-limits) for the complete specification.
-
-**Key limits:** DHT Announce: 5/min, Chat Dial: 20/hr, DHT Query: 30/min
+Rate limits prevent spam and abuse. See [PROTOCOL.md](PROTOCOL.md#rate-limits) for the complete specification of layered bounds on DHT activity and WebRTC connections.
 
 ### Mute / Block Lists
 

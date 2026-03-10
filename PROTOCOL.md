@@ -118,23 +118,25 @@ See [SEMANTIC.md](SEMANTIC.md#relation-ontology) for the complete relation ontol
 
 **Tags:** `in_location`, `during_time`, `with_mood`, `under_domain`, `causes_effect`, `part_of`, `similar_to`, `opposed_to`, `requires`, `boosted_by`
 
-### Key Schema
+### Key Schema (DHT Key Registry)
 
-All DHT keys are prefixed by type for namespace isolation:
+All DHT keys are prefixed by type for namespace isolation. This serves as the single source of truth for network data structures and their ephemeral lifespans:
 
-```
-/isc/announce/<channelID>/<lsh_hash>
-/isc/delegate/<peerID>
-/isc/mute/<peerID>
-/isc/model_registry
-/isc/post/<channelID>/<lsh_hash>
-/isc/likes/<postID>
-/isc/reposts/<postID>
-/isc/replies/<postID>
-/isc/profile/channels/<peerID>
-/isc/follow/<peerID>
-/isc/trending/<channelID>
-```
+| Data Type | DHT Key Pattern | TTL |
+|---|---|---|
+| **Announcements** | `/isc/announce/<modelHash>/<lsh_hash>` | Tier-dependent (5-20 min) |
+| **Delegation** | `/isc/delegate/<peerID>` | 5 minutes |
+| **Mutes** | `/isc/mute/<peerID>` | No expiry (manual unmute) |
+| **Model Registry** | `/isc/model_registry` | 14 days (signed manifest) |
+| **Posts** | `/isc/post/<modelHash>/<lsh_hash>` | 86400 (1 day) |
+| **Likes** | `/isc/likes/<postID>` | 604800 (7 days) |
+| **Reposts** | `/isc/reposts/<postID>` | 604800 (7 days) |
+| **Replies** | `/isc/replies/<postID>` | 604800 (7 days) |
+| **Profiles** | `/isc/profile/channels/<peerID>` | 2592000 (30 days) |
+| **Follows** | `/isc/follow/<peerID>` | No expiry (manual unfollow) |
+| **Trending** | `/isc/trending/<modelHash>` | 3600 (1 hour) |
+
+> **Note**: Routing uses the `modelHash` (e.g., `abc123def456` for `all-MiniLM-L6-v2`) rather than `channelID` to ensure that identical thoughts in completely different channels naturally map to the same DHT space, enabling cross-topic serendipity.
 
 ### LSH (Locality-Sensitive Hashing)
 
@@ -155,8 +157,8 @@ function seededRng(seed: string): () => number {
   };
 }
 
-function lshHash(vec: number[], channelId: string, numHashes: number = 20, hashLen: number = 32): string[] {
-  const rng = seededRng(channelId);
+function lshHash(vec: number[], seed: string, numHashes: number = 20, hashLen: number = 32): string[] {
+  const rng = seededRng(seed);
   const hashes: string[] = [];
 
   for (let i = 0; i < numHashes; i++) {
@@ -211,8 +213,8 @@ interface SignedAnnouncement {
 ### Announcement Loop
 
 ```javascript
-async function announceChannel(channel: Channel, dists: Distribution[]) {
-  const hashes = lshHash(dists[0].mu, channel.id, TIER.numHashes);
+async function announceChannel(channel: Channel, dists: Distribution[], modelHash: string) {
+  const hashes = lshHash(dists[0].mu, modelHash, TIER.numHashes);
   
   for (let i = 0; i < Math.min(hashes.length, dists.length); i++) {
     const payload: SignedAnnouncement = {
@@ -226,7 +228,7 @@ async function announceChannel(channel: Channel, dists: Distribution[]) {
       signature: await sign(encode(payload), keypair.privateKey),
     };
     
-    const key = `/isc/announce/${channel.id}/${hashes[i]}`;
+    const key = `/isc/announce/${modelHash}/${hashes[i]}`;
     await node.contentRouting.put(key, encode(payload), { ttl: payload.ttl });
   }
 }
@@ -235,13 +237,13 @@ async function announceChannel(channel: Channel, dists: Distribution[]) {
 ### Query Protocol
 
 ```javascript
-async function queryProximals(sample: number[], channelId: string): Promise<PeerInfo[]> {
+async function queryProximals(sample: number[], modelHash: string): Promise<PeerInfo[]> {
   const seen = new Set<string>();
   const candidates: PeerInfo[] = [];
-  const hashes = lshHash(sample, channelId, TIER.numHashes);
+  const hashes = lshHash(sample, modelHash, TIER.numHashes);
 
   for (const key of hashes) {
-    const values = await node.contentRouting.getMany(`/isc/announce/${channelId}/${key}`, {
+    const values = await node.contentRouting.getMany(`/isc/announce/${modelHash}/${key}`, {
       count: TIER.candidateCap,
     });
     
@@ -320,7 +322,7 @@ async function initiateChat(peerID: string, channel: Channel): Promise<Stream> {
 
 1. When peer detects 3+ peers within 0.15 similarity:
    - Compute centroid: `mean([vec1, vec2, ...])`
-   - Generate room ID: `sha256(centroid + channelID + timestamp_hour)`
+   - Generate room ID: `sha256(centroid + modelHash + timestamp_hour)`
    - Announce room membership to DHT at `/isc/group/<roomID>`
 
 2. Mesh Formation:
