@@ -299,9 +299,9 @@ async function handleChatStream(stream: Stream) {
 
 Because WebRTC requires SDP offer/answer exchange before connecting, peers use a dedicated Libp2p PubSub topic (`/isc/signal/<peerID>`) for signaling when online.
 
-To solve the "Browser Backgrounding" problem (where mobile OSs kill WebSockets), peers register a **Mailbox** with a community relay. The Mailbox protocol (`/isc/mailbox/1.0`) buffers signaling messages and chat payloads.
+To solve the "Browser Backgrounding" problem (where mobile OSs kill WebSockets), peers register a **Mailbox** with a community relay. These relays are community-operated, swappable, and do not decrypt the payloads. The Mailbox protocol (`/isc/mailbox/1.0`) buffers encrypted signaling messages and chat payloads.
 
-When a message arrives for a sleeping peer, the Mailbox relay triggers a **Web Push Notification** to wake the client's Service Worker.
+When a message arrives for a sleeping peer, the Mailbox relay triggers a standard **Web Push Notification** to wake the client's Service Worker, which retrieves the buffered messages, decrypts them, and establishes the WebRTC connection in the background.
 
 ```typescript
 interface SignalMessage {

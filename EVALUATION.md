@@ -22,10 +22,13 @@
   Libp2p circuit relays and public STUN/TURN, but don't clearly explain how the
   initial SDP exchange happens securely and reliably purely via the DHT without
   a centralized signaling server or persistent connection to a relay.
-- **Impact**: If signaling relies on DHT puts/gets, the latency (often multiple
-  seconds) will make chat initiation painfully slow. If it relies on circuit
-  relays, the network centralization simply shifts to the relay operators,
-  introducing potential bottlenecks and single points of failure.
+- **Resolution**: Signaling is handled via a dedicated Libp2p PubSub topic
+  (`/isc/signal/<peerID>`) for online peers. For backgrounded or offline peers,
+  the Mailbox Protocol (`/isc/mailbox/1.0`) buffers encrypted payloads via
+  community-operated relays. Web Push Notifications wake the client's Service
+  Worker to establish the connection asynchronously. Because these relays are
+  swappable and payloads are encrypted, this avoids the typical central points
+  of failure or surveillance.
 
 ### Supernode DHT Views & Data Consistency
 
@@ -89,11 +92,11 @@
   attacker can generate millions of peerIDs and flood the DHT with
   announcements for a specific target embedding (or all embeddings), pushing
   legitimate announcements out of the Kademlia k-buckets.
-- **Impact**: Denial of Service for discovery. The proposed mitigations (rate
-  limiting, mutual signing, reputation decay) do not prevent a determined
-  attacker from flooding the network with fresh, throwaway sybil nodes.
-  "Stake-based signaling" (Lightning) fixes this but adds immense friction to
-  onboarding.
+- **Impact**: Denial of Service for discovery. Rate limiting, mutual signing,
+  and reputation decay are insufficient if an attacker can cheaply generate
+  sybil nodes. The "Web of Trust" (Cryptographic Vouching) mitigation resolves
+  this by tying new identities to established reputations, eliminating the
+  need for energy-wasteful Proof-of-Work or friction-heavy financial stakes.
 
 ### Privacy in Delegation
 
