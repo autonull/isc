@@ -42,6 +42,10 @@ Every view inherits this state. The persistent status bar shows the *least favor
 | **Degraded** | △ amber | Minimal-tier or delegation-failed fallback |
 | **Offline** | ✕ red | No network; actions queued |
 | **Rate Limited** | ⏸ orange | Self-throttled; countdown to window reset |
+| **Low Power** | 🔋 amber | Battery ≤ 20% or OS low-power mode active; background activities paused |
+| **Strict Mode** | 🛡 blue | Inbound WebRTC connections paused; outbound discovery continues |
+
+**Status bar debounce rules**: Transient states (Connecting, Matching, Rate Limited) are suppressed for the first **2 seconds** before appearing; this prevents anxious flickering during normal operation. Low Power and Strict Mode are displayed immediately and persistently until resolved.
 
 ---
 
@@ -157,6 +161,25 @@ The URL param `?mode=<mode>` tailors copy and defaults:
 
 After import: passphrase prompt → keypair decrypted → channels re-queried from DHT → lands on Channel List.
 
+### 1.5 Pair Device / Multi-Device Sync (Phase 2+)
+
+**Problem addressed**: Chat history, drafts, and Places are stored in local IndexedDB and do not automatically transfer across devices. A user importing their keypair to a laptop will have their identity but none of their local content.
+
+**Entry**: Settings → Identity & Keys → **Pair Device** · OR first-run prompt on a device that has just imported a keypair: *"Sync content from your other device? [Pair now] [Skip]"*
+
+**Pairing flow**:
+1. **Primary device** (source): Settings → Identity & Keys → Pair Device → **Show pairing QR**. A QR code is displayed encoding a one-time WebRTC offer (signed with the keypair).
+2. **Secondary device** (destination): Settings → Identity & Keys → Pair Device → **Scan to receive**. Camera scans the QR; a direct WebRTC connection is established over the local network or via relay.
+3. **Content negotiation**: Primary sends a manifest (item types + last-modified timestamps). Secondary shows: *"Found 12 channels, 342 messages, 8 drafts, 2 Places. [Sync all] [Choose what to sync]"*
+4. **Transfer**: encrypted WebRTC data channel; progress bar with per-category counts. Encrypted with the shared keypair — no plaintext leaves the browser.
+5. **Completion**: *"Sync complete. All content is now available on this device."*
+
+**Ongoing sync** (Phase 2+): Devices with the same keypair can maintain an opt-in background sync channel (persistent WebRTC connection or periodic re-pair). New messages, drafts, and Place edits propagate within ~5 seconds. Conflicts resolved by LWW (last-write-wins) with a 1-second granularity.
+
+**Manual sync**: If two devices are on the same LAN, ISC can auto-discover via mDNS and prompt: *"Found your other device on this network. Sync now? [Yes] [Not now]"*
+
+**What does NOT sync**: Keypairs are never re-transmitted after pairing (they were already identical). The model file is re-downloaded independently on each device (too large to tunnel efficiently).
+
 ---
 
 ## 2. Channel List (Home)
@@ -173,6 +196,8 @@ The root screen. A **channel** is a named, embedded thought context: description
 | **Model loading** | Thin progress bar across top; channels show pending state |
 | **Offline** | All badges grey; offline banner; queue depth shown |
 | **Degraded** | Amber △ on affected channels; tap for explanation |
+| **Low Power** | Persistent amber banner: *"🔋 Low battery — background matching paused. [Resume]"* All background DHT polling and Supernode serving paused automatically. Outbound queries only on manual refresh. |
+| **Strict Mode** | Persistent blue banner: *"🛡 Strict mode on — inbound connections paused."* Tap to disable. Channels still announce; outbound Dial still works; all unsolicited inbound WebRTC dials are rejected with no indication to the caller. |
 
 ### 2.2 Channel Card
 
@@ -241,7 +266,13 @@ Pre-built starting points shown on empty state and in the editor:
 
 ### 3.2 AI-Assisted Description
 
-**Write with AI** button (inline, not prominent): generates 3 candidate descriptions from a brief free-text prompt the user gives. Runs locally using the embedding model tokenizer (no external API call). User picks one, ignores all, or edits. Copy: *"Suggestions generated locally on your device — not sent anywhere."*
+> **Technical note**: The primary embedding model (`all-MiniLM-L6-v2`) is **encoder-only** — it produces vector representations but cannot generate text. Two implementation paths are offered:
+
+**Path A — Keyword extraction (default, no extra download)**: Uses the embedding model's tokenizer vocabulary to surface the top 10–15 concept terms that are closest to the current description's embedding. Shown as a tag cloud; user taps tags to incorporate them into their description. Copy: *"Key concepts detected from what you've written — tap to add them."* This requires zero additional model weight.
+
+**Path B — Local generative AI (optional, ~1–2 GB download)**: If the user has downloaded an optional quantized decoder model (e.g., TinyLlama-1.1B-Q4 or Phi-2-Q4), the **Write with AI** button activates full prose generation: generates 3 candidate descriptions from a brief free-text prompt. Download prompt appears on first tap of the button: *"Full AI suggestions require an additional 1.2 GB model. Download now? (Wi-Fi recommended) [Download] [Use keywords instead]"*
+
+Path A is the default experience. Path B is surfaced as an upgrade prompt. Both run entirely locally; nothing is sent to any server. Copy on both: *"Generated on your device — not sent anywhere."*
 
 ### 3.3 Relation Tag Builder
 
@@ -331,12 +362,16 @@ The core discovery view for one channel. Shows who is semantically nearby.
 
 **Empty state variants**:
 
-| Condition | Message |
-|---|---|
-| No peers, model loaded | *"No thought neighbors yet. Stay active — your presence is propagating."* |
-| No peers, word-hash mode | *"Using keyword matching (no model loaded). Connect to Wi-Fi for semantic matching."* |
-| All below threshold | *"All peers are below your threshold. Lower it to see more, or enable Chaos mode."* |
-| Offline | *"Offline — showing last known matches."* Greyed list with timestamps. |
+| Condition | Message | Auto-action |
+|---|---|---|
+| No peers, model loaded | *"No thought neighbors yet. Your presence is propagating."* | After 30 s, auto-expand threshold by 0.10 and re-query; show *"Expanding search…"* |
+| No peers after expansion | *"Still nothing. Broadening to general topics…"* | Silently drop threshold by another 0.10 and re-query with σ+0.05 |
+| No peers, sparse network | *"[N] peers are active on the network — none close to your channel yet."* + **[Show Global Pulse]** CTA | Global Pulse shows a random sample of 10 currently-active channels to prove the network is alive |
+| No peers, word-hash mode | *"Using keyword matching (no model loaded). Connect to Wi-Fi for semantic matching."* | — |
+| All below threshold | *"All peers are below your threshold. Lower it to see more, or enable Chaos mode."* | Show threshold slider inline in the empty state card |
+| Offline | *"Offline — showing last known matches."* Greyed list with timestamps. | — |
+
+**Global Pulse panel** (triggered from the empty state CTA above): a read-only scrollable list of 10 random currently-active channel *descriptions* (no peer IDs) sampled from the DHT. Each shows its topic and how many peers are active in that neighborhood. Tapping one opens a Channel Editor pre-seeded with that description as inspiration. Copy at top: *"The network is alive — here's what people are thinking about right now."*
 
 ### 4.2 Peer Card (Detail Sheet)
 
@@ -426,6 +461,7 @@ Computation is entirely local (no API). Uses the loaded embedding model's vocabu
 - Each member: abbreviated peer ID · similarity to centroid · leaving indicator (greyed dot when < 0.55 with drift note).
 - Tap member → Peer Card.
 - Members > 8: *"Observer mode: you can read but not send."*
+- **Bandwidth scaling**: as group size grows, the UI progressively drops: typing indicators (off at ≥5 members); video thumbnails (off at ≥4 in video mode); read receipts (off at ≥3). A subtle badge shows what has been disabled: *"⚡ Reduced for performance"*. This prevents mesh WebRTC from saturating bandwidth before reaching the 8-participant observer threshold.
 
 **Invitation toast**: *"QmX… invited you to a group (similarity 0.91, 4 members). [Join] [Decline]"*
 
@@ -490,6 +526,12 @@ Semantic proximity feed ranked by ANN queries on active channel distributions.
 - **Similarity badge**: always visible (*"0.82 ~ AI Ethics"*). Tap → inline explanation: *"This post is 0.82 semantically similar to your AI Ethics channel's current embedding."*
 - **Author**: peer ID (abbreviated). If they have a bio, show it on hover/long-press.
 - **Overflow ⋯**: Share link · Mute author · Report · See similar posts · See author's profile.
+
+**Loading state**: Because the feed queries the DHT via ANN across a distributed network, initial load takes 2–10 seconds (vs. milliseconds for a central database). Rather than a generic spinner:
+- Show a skeleton list of 3 shimmer cards immediately.
+- Overlay caption: *"Gathering thoughts from the network…"* (not *"Loading"*).
+- Each card populates as it resolves — results trickle in rather than bulk-appearing.
+- If no results after 10s: show the ghost-town empty state (auto-expand horizon triggers at 30s).
 
 **Feed controls** (collapsible):
 - **Threshold** slider (default 0.6).
@@ -981,6 +1023,7 @@ Operator runs `isc bootstrap start --port 4001 --private`. Members add the resul
 | **Auto-dial on very close** | Toggle | Prompt at 0.85+; default off |
 | **Tier override** | Picker | Manual override of auto-detection |
 | **Announce on cellular** | Toggle | Default off |
+| **Strict mode (inbound block)** | Toggle | Reject all unsolicited inbound WebRTC dials; outbound Dial still works. Phase 1 defense against Sybil dial-spam before reputation system launches. Banner shown when active. Default off. |
 
 ### 19d. Delegation & Supernode
 
@@ -1298,6 +1341,7 @@ When in-chat/group similarity < 0.55: non-blocking card at thread bottom: *"Thou
 | `M` | Toggle Map / List |
 | `C` | Toggle Chaos mode |
 | `R` | Manual refresh |
+| `Ctrl/Cmd+F` | Focus threshold/filter bar |
 | `↑/↓` | Navigate list |
 | `Enter` | Open focused peer card |
 | `D` | Dial focused peer |
@@ -1504,4 +1548,6 @@ Phase 1–2: Home + Explore + Profile visible; Feed + Communities shown greyed w
 > |---|---|
 > | 2026-03-09 | Initial draft (v2.0) — 23 sections, 973 lines |
 > | 2026-03-10 | Major revision (v2.1) — 31 sections, ~1800 lines. Added: Places/Idea Boards (§11), Search (§12), Lightning Tips Wallet (§14), Model Registry (§15), AT Protocol Bridge (§16), DAO Governance (§17), Enterprise Admin (§18), Community Courts (§23.4), Thought Bridge (§4.4), Video Calls (§5.4), Ephemeral mode (§5.1), AI-assisted channel description (§3.2), Channel templates (§2.5, §3), 2D Semantic Map enhancements (§4.3), Fuzzy anonymity mode (§4.1), Vector reveal (§9.1), Places (§11), Keyboard shortcuts (§26), Micro-interactions spec (§27), Civilization-scale use cases (§28, 10 scenarios), expanded Phased availability table (§29), deep-linked navigation (§30), full Settings panels (§19). |
+> | 2026-03-10 | Expert review patch (v2.2) — 1,551 lines. Applied 9 targeted fixes: (1) Added `Low Power` + `Strict Mode` global states with 2-second debounce rule for transient states. (2) Added §1.5 Pair Device / Multi-Device Sync (QR pairing, encrypted WebRTC transfer, LAN mDNS discovery, LWW ongoing sync). (3) Corrected §3.2 AI-assisted description — clarified `all-MiniLM-L6-v2` is encoder-only; introduced two paths: keyword extraction (default, zero extra download) and optional decoder model (TinyLlama/Phi-2, ~1.2 GB, opt-in). (4) Expanded §4.1 ghost-town cold start: auto-expanding search horizon after 30 s + Global Pulse panel (10 random active channels). (5) Added §5.2 bandwidth-scaling note for group chat mesh (typing indicators, video thumbnails, read receipts progressively disabled as member count grows). (6) Added §6.1 DHT-latency loading state: skeleton shimmer + *"Gathering thoughts from the network…"* copy. (7) Added `Low Power` + `Strict Mode` rows to §2.1 Channel List visual states with exact banner copy and behavior. (8) Added `Strict mode (inbound block)` to §19c Matching settings — Phase 1 Sybil dial-spam protection. (9) Added `Ctrl/Cmd+F` shortcut to §26.2 Match Explorer shortcuts. |
+
 
