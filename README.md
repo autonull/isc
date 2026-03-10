@@ -226,7 +226,10 @@ async function computeRelationalDistributions(channel) {
 }
 ```
 
-**Tier fallback**: Low tier announces root distribution only. Mid tier announces root + up to 2 key relations. High tier announces all.
+**Tier fallback for relations**:
+- **Low tier**: Root distribution only (no relations announced)
+- **Mid tier**: Root + up to 2 relations (user-selected in Settings)
+- **High tier**: All relations (max 5)
 
 ### Relational Matching
 
@@ -280,6 +283,13 @@ Embedding spaces from different models are not directly comparable, even at iden
 | `gte-tiny` | 384 | ~4 MB | **Low** | Minimal compute; same-family fallback |
 | Word-hash fallback | — | 0 MB | **Minimal** | No model; Hamming distance on predefined word hashes |
 
+**Word-hash fallback specification** (Minimal tier):
+- Predefined vocabulary of 500 common words (English, curated for semantic coverage)
+- Text → 500-bit bitmap (bit = 1 if word present, 0 otherwise)
+- Similarity → Hamming distance (normalized to [0, 1])
+- No model download required; works instantly on minimal devices
+- Limitations: English-only, no semantic nuance (synonyms not recognized)
+
 **Rules enforced in code:**
 
 - One model loaded per tier; never allow arbitrary user-selected models in production.
@@ -310,7 +320,8 @@ To prevent network fragmentation across embedding model versions:
 2. **Compatibility groups**: Clients maintain a `supported_models` list. During query refinement, candidates with unsupported models are silently filtered. Peers announce their supported models in bootstrap handshake.
 
 3. **Graceful migration**: When a new canonical model is adopted:
-   - Old-model peers continue operating in a "compatibility shard" (separate LSH buckets)
+   - Old-model peers continue operating in a "compatibility shard" (separate LSH bucket prefixes)
+   - **Compatibility shard mechanics**: Each model version uses a unique LSH key prefix (e.g., `v1:abc123`, `v2:def456`); queries only search matching prefixes; no cross-shard matching in Phase 1
    - Dual-announcement mode (optional, High-tier only) allows peers to announce in both old and new spaces for 90 days
    - After 90 days, old-model announcements expire naturally via TTL
    - Clients show migration prompt when >50% of matches use newer model
@@ -560,13 +571,15 @@ ISC supports **capability-aware delegation**: high-tier peers optionally act as 
 
 #### Supernode Incentives
 
-| Incentive Type | Description |
-|----------------|-------------|
-| **Reputation badges** | Visible "Trusted Supernode" badge in profile; boosts match priority |
-| **Priority queuing** | Supernodes receive faster ANN results from other supernodes |
-| **Optional tips** | Lightning Network micropayments for verified assistance (opt-in) |
-| **Governance weight** | High-rep supernodes carry more weight in community moderation decisions |
-| **Early feature access** | Beta features rolled out to active supernodes first |
+| Incentive Type | Description | Phase |
+|----------------|-------------|-------|
+| **Reputation badges** | Visible "Trusted Supernode" badge in profile; boosts match priority | Phase 1 |
+| **Priority queuing** | Supernodes receive faster ANN results from other supernodes | Phase 2 |
+| **Optional tips** | Lightning Network micropayments for verified assistance (opt-in) | Phase 3 (future) |
+| **Governance weight** | High-rep supernodes carry more weight in community moderation decisions | Phase 2 |
+| **Early feature access** | Beta features rolled out to active supernodes first | Phase 2 |
+
+**Phase 1 note**: Initial deployment relies on **voluntary participation**. Community members running supernodes are motivated by altruism and improved match priority. Reputation badges provide social recognition. Monetary incentives (Lightning tips) are deferred to Phase 3 pending demand.
 
 #### Configuration
 
@@ -626,13 +639,13 @@ ISC operates under the following security assumptions:
 | **DHT bootstrap peers** | Not actively adversarial; may go offline | Multiple bootstrap peers; graceful reconnect; fallback to centralized rendezvous (opt-in) | Same |
 | **Sybil attackers** | Can create many identities | Social trust barrier (invite-only) | Reputation decay + uptime history + opt-in stake |
 | **Network eavesdroppers** | Can observe traffic patterns but not decrypt content | WebRTC DTLS + Noise protocol + E2E encryption for delegation requests | Same |
-| **Browser compromise** | Out of scope (assumes honest client) | N/A — user responsible for browser security | Same |
+| **Browser compromise** | XSS vulnerabilities possible; IndexedDB accessible to malicious scripts | Passphrase encryption for private keys (optional); XSS testing in CI | Same + hardware wallet integration (future) |
 | **Model poisoning** | Attacker distributes malicious embedding model | Canonical model registry (DHT-hosted, signed); clients reject unknown model hashes | Same |
 | **Reputation gaming** | Attacker creates fake positive interactions | N/A (reputation not yet enabled) | Mutual signing + time-weighted decay |
 
 **Explicitly Out of Scope**:
-- Browser zero-day exploits
-- User key compromise (private key stored in IndexedDB; user responsible for passphrase)
+- Browser zero-day exploits (mitigated by regular dependency updates)
+- User key compromise without passphrase (mitigated by optional passphrase encryption)
 - Physical device theft
 - Government-level traffic correlation attacks (Tor/I2P integration mitigates but doesn't eliminate)
 
@@ -647,7 +660,7 @@ ISC adapts to device RAM, CPU, and network at startup. A capability probe runs b
 | **High** | Desktop / modern laptop | `all-MiniLM-L6-v2` (384-dim, ~22 MB) | All (max 5) | HNSW via usearch | 20 | 5 min | ✅ Can request | ✅ Can serve (opt-in) |
 | **Mid** | Mid-range phone / older laptop | `paraphrase-MiniLM-L3-v3` (384-dim, ~8 MB) | Root + 2 | HNSW lite | 12 | 8 min | ✅ Can request | ⚠️ Limited serve |
 | **Low** | Budget phone / slow connection | `gte-tiny` (384-dim, ~4 MB) | Root only | Linear scan | 8 | 15 min | ✅ Can request | ❌ Cannot serve |
-| **Minimal** | Very constrained / 2G | Word-hash fallback (no model) | Root only | Hamming | 6 | 20 min | ✅ Can request | ❌ Cannot serve |
+| **Minimal** | Very constrained / 2G | Word-hash fallback (500-word vocab, Hamming distance) | Root only | Hamming | 6 | 20 min | ✅ Can request | ❌ Cannot serve |
 
 > **Delegate Mode**: High-tier peers can opt into `supernode` mode via Settings. When enabled, they advertise delegation capabilities to the DHT and assist Low/Minimal peers with embedding, ANN, or verification tasks. All delegated work is cryptographically signed and locally verifiable—no blind trust required. See [Supernode Delegation Architecture](#7-supernode-delegation-architecture) for requirements.
 
@@ -688,6 +701,7 @@ async function detectTier() {
 | **State / channels** | `localStorage` + IndexedDB | Channel metadata in `localStorage`; embeddings, history, keypair in IndexedDB |
 | **Distribution math** | Vanilla JS | Gaussian sampling, Monte Carlo distance, bipartite relational alignment |
 | **UI** | Vanilla HTML/JS | (or React/Svelte — your choice) |
+| **i18n** | Community-driven | All user-facing strings externalized; RTL support; community translations welcomed |
 
 ---
 
@@ -724,13 +738,24 @@ ISC supports two deployment modes with different safety assumptions:
 | **Public Network** (Phase 2+) | Open participation, potential adversaries | Reputation weighting + stake signaling + coherence checks + decentralised moderation |
 
 **Implemented mechanisms (Trusted Network mode):**
-- **Rate limiting**: Per-peer announcement caps (max 5 DHT puts/minute, 50/hour). Enforced client-side; supernodes verify and reject excess requests.
+- **Rate limiting**: See table below for complete rate limit hierarchy.
 - **Mute / block lists**: Signed mute events stored in DHT (per user). Clients auto-filter flagged vectors from match results.
-- **Semantic filters**: Sim-threshold controls (per channel) let users define their own "safe zone" — content far from their channel's vector space is naturally deprioritised.
+- **Semantic filters**: Minimum similarity threshold (default 0.55) below which announcements are not returned to users. Per-channel controls allow users to define their own "safe zone."
 - **Harassment exit**: Auto-decay chats when similarity drops below threshold (thought drift = natural exit). One-click mute with propagation.
+
+**Rate Limit Hierarchy**:
+
+| Rate Limit Type | Scope | Limit | Enforcement Point |
+|-----------------|-------|-------|-------------------|
+| DHT Announce | per peer / min | 5 | Local client + supernode |
+| Delegation Request | per peer / min | 3 | Supernode |
+| Delegation Response | per supernode concurrent | 10 | Supernode |
+| Chat Dial | per peer / hr | 20 | Local client |
+| DHT Query | per peer / min | 30 | Bootstrap relay |
 
 **Planned mechanisms (Public Network mode — Phase 2):**
 - **Reputation weighting**: Peers accumulate reputation via successful interactions. Low-rep announcements are deprioritized in ANN results. Reputation decays with 30-day half-life.
+  - **Sybil resistance**: Mutual signing requirement (both parties confirm interaction) + time-weighted decay + 7-day bootstrapping period for new peers
 - **Stake-based signaling** (opt-in): Users may lock Lightning satoshis as sybil-resistance signal; slashed on verified abuse. *Never required for basic use.*
 - **Semantic coherence checks**: Announcements with embeddings far from stated description (>0.6 cosine distance) are flagged for supernode review.
 - **Mute/block propagation**: Signed mute events stored in DHT; high-rep peers carry more weight in filtering decisions.
@@ -849,6 +874,8 @@ ISC's P2P and semantic foundations support a full decentralised social network �
 
 > **Testing locally**: open two tabs, wait ~10 s for DHT bootstrap, then embed similar text in both. They should surface each other as a match.
 
+> **Accessibility**: ISC is designed for WCAG 2.1 AA compliance. Tested with NVDA, VoiceOver, and JAWS screen readers. Report accessibility issues via GitHub Issues.
+
 ### Testing Supernode Delegation Locally
 
 1. **Start a supernode**:
@@ -909,7 +936,7 @@ Hardening: relational embeddings + reputation system + moderation primitives.
 
 - [ ] Relational embeddings — cross-channel semantic composition
 - [ ] Reputation system + signed moderation events (for public network mode)
-- [ ] Offline queue + reconnect logic
+- [ ] Offline-first: queue + background sync for intermittent connectivity
 - [ ] Delegation health metrics + supernode ranking
 - [ ] PWA — installable on mobile, offline-capable shell
 - [ ] IPFS deployment — zero-infra hosting for static bundle
@@ -965,6 +992,8 @@ Before merging delegation-related or cryptographic PRs, ensure:
 - [ ] Reputation events require mutual signing (both parties confirm interaction)
 - [ ] DHT announcements include TTL and are signed
 - [ ] WebRTC streams use DTLS encryption (verify via browser DevTools)
+- [ ] Accessibility audit (NVDA, VoiceOver) completed
+- [ ] Browser compromise mitigations: XSS testing completed; passphrase encryption recommended for high-risk users
 
 PRs failing any checklist item will be rejected without review.
 
