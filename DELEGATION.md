@@ -75,37 +75,57 @@ Supernodes broadcast signed `delegate_capability` announcements to DHT:
 
 ### 1. Secure Request
 
-Low-tier peers encrypt requests with supernode's public key and sign with their own key:
+Low-tier peers encrypt requests using an ECIES-style scheme: they generate an ephemeral ECDH keypair, derive a shared secret with the supernode's public encryption key, encrypt the payload, and transmit the ephemeral public key. They then sign the entire request with their identity signing key (from the dual-key system described in `SECURITY.md`):
 
 ```typescript
 interface DelegateRequest {
   type: 'delegate_request';
-  requestID: string;           // UUID v4
+  requestID: string;
   service: 'embed' | 'ann_query' | 'sig_verify';
-  payload: Uint8Array;         // Encrypted with supernode's public key
-  requesterPubKey: Uint8Array; // Requester's ed25519 public key
+  payload: Uint8Array;         // Encrypted using ephemeral ECDH + AES-GCM
+  ephemeralPubKey: Uint8Array; // Ephemeral ECDH public key required for supernode decryption
+  requesterPubKey: Uint8Array; // Requester's public signing key (ed25519)
   timestamp: number;
-  signature: Uint8Array;       // Signed by requester
+  signature: Uint8Array;       // Signed by requester's ed25519 identity key
 }
 ```
 
-**Request encryption**:
+**Request Encryption (Native Web Crypto API)**:
 
 ```javascript
-import sodium from 'libsodium-wrappers';
-
+// ECIES-style encryption generating an ephemeral ECDH keypair per request
 async function encryptForSupernode(
   plaintext: Uint8Array,
-  supernodeEd25519PubKey: Uint8Array
-): Promise<Uint8Array> {
-  await sodium.ready;
-  // Convert ed25519 signing key to x25519 encryption key
-  const x25519PubKey = sodium.crypto_sign_ed25519_pk_to_curve25519(supernodeEd25519PubKey);
-  return sodium.crypto_box_seal(plaintext, x25519PubKey);
+  supernodeEncryptionPubKey: CryptoKey
+): Promise<{ ciphertext: Uint8Array, iv: Uint8Array, ephemeralPubKey: CryptoKey }> {
+
+  // 1. Generate an ephemeral ECDH keypair
+  const ephemeralKeys = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' },
+    true,
+    ['deriveKey']
+  );
+
+  // 2. Derive shared secret using the supernode's public key
+  const sharedSecret = await crypto.subtle.deriveKey(
+    { name: 'ECDH', public: supernodeEncryptionPubKey },
+    ephemeralKeys.privateKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt']
+  );
+
+  // 3. Encrypt payload
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    sharedSecret,
+    plaintext
+  ));
+
+  return { ciphertext, iv, ephemeralPubKey: ephemeralKeys.publicKey };
 }
 ```
-
-*Note: Signatures use Web Crypto API (ed25519), while encryption uses libsodium-wrappers (sealed boxes). The ed25519 public key must be converted to x25519 before encryption.*
 
 ### 2. Verifiable Response
 
@@ -207,24 +227,25 @@ function scoreSupernode(cap: DelegateCapability, stats: SupernodeStats): number 
 - **Opt-in stake**: Boosts visibility (Phase 2+)
 - **Community flagging**: Anomalous behavior can be flagged by other peers
 
-### Privacy Preserved
+### Privacy Preserved (with Trade-offs)
 
-- **E2E encryption**: Requests encrypted with supernode's public key
-- **Minimal exposure**: Only channel descriptions delegated—never raw chat content
-- **No logging policy**: Supernodes expected to discard request contents after computing results
+- **E2E encryption**: Requests encrypted with supernode's public encryption key (protecting transit).
+- **Minimal exposure**: Only channel descriptions are delegated, never raw chat content.
+- **Privacy Trade-off**: Supernodes *must* decrypt the channel description text to compute the embedding. ISC relies on a strict honor system where supernodes promise to discard the text after computation. For highly sensitive thought-contexts, users should disable delegation in Settings.
 
 ---
 
 ## Delegation Services
 
-### Embed Service
+### Embed & Translate Service
 
-Compute embedding for text:
+Compute an embedding for text, optionally translating from an old model to a new canonical model during network migrations:
 
 ```typescript
 interface EmbedRequest {
   text: string;
   model: string;
+  targetModel?: string; // Optional: used for Model Bridging
 }
 
 interface EmbedResponse {
@@ -248,7 +269,7 @@ async function handleEmbedRequest(req: EmbedRequest): Promise<EmbedResponse> {
 
 ### ANN Query Service
 
-Run approximate nearest neighbor search over the supernode's persistent, globally-updated HNSW index:
+Run approximate nearest neighbor search over the supernode's persistent, globally-updated HNSW index. Because standard Kademlia DHT routing does not provide global visibility, supernodes build their index by subscribing to a global Libp2p PubSub firehose (`/isc/firehose/v1`).
 
 ```typescript
 interface ANNQueryRequest {
@@ -262,7 +283,7 @@ interface ANNQueryResponse {
   scores: number[];
 }
 
-// Supernodes continuously map DHT announcements into their local `globalHNSWIndex`
+// Supernodes continuously map PubSub announcements into their local `globalHNSWIndex`
 async function handleANNQueryRequest(req: ANNQueryRequest): Promise<ANNQueryResponse> {
   // Query against the supernode's pre-built view of the network
   const index = globalHNSWIndex.get(req.modelHash);

@@ -167,14 +167,14 @@ Zero-dependency, run instantly, form the immune system for the matching core.
 | Spatiotemporal overlap | Two overlapping lat/long windows | Spatiotemporal bonus applied |
 | No spatiotemporal overlap | 10,000 km apart | No bonus, no crash |
 
-#### Monte Carlo Sampling
+#### Analytical Approximation (`expectedCosineSimilarity`)
 
 | Test | Scenario | Expected |
 |------|----------|----------|
-| Reproducibility | Seeded samples from `(μ, σ=0.1)` | Identical output given same seed |
-| Spread = 0 | σ = 0 | All samples = μ (point distribution) |
-| Large spread | σ = 1.0 | Sample mean ≈ μ within tolerance after 100 draws |
-| High tier (100 samples) vs Low tier (20 samples) | Same distributions | Both converge; High tier closer to true score |
+| Identical means | `μ1 = μ2, σ1 = σ2 = 0.1` | Score near 1.0, lower than point dist due to spread |
+| Spread = 0 | `σ1 = σ2 = 0` | Standard cosine similarity between `μ1` and `μ2` |
+| Large spread | `σ1 = 1.0, σ2 = 1.0` | Score trends toward 0 (uniform sphere) |
+| High vs Low spread | `σ1 = 0.1, σ2 = 0.9` | Asymmetric spread handles gracefully, score < point sim |
 
 #### Signature Verification
 
@@ -462,19 +462,20 @@ Expected: Intra-mood score > cross-mood score on average.
 
 ### 2.5 Model Version Migration Simulation
 
-Simulate the 90-day dual-announcement migration window.
+Simulate Model Bridging via Supernode `translate_embedding` service.
 
 **Migration Protocol**:
 
-- Days 0-90: Peers announce both v1 and v2 vectors (dual-announce)
-- Days 91+: v1 TTLs expire; v1-only peers isolated in compatibility shard
+- Low/Minimal peers query their own `modelHash` keyspace
+- If they receive no hits, they request `translate_embedding` from a Supernode
+- Supernode translates embedding to new model, queries new space, and returns results
 
 | Phase | Scenario | Expected |
 |-------|----------|----------|
 | Pre-migration | All peers on v1 | Normal matching |
-| Migration start | 10% adopt v2; dual-announce enabled on High tier | v2 peers match each other; v1 peers see v1 peers |
+| Migration start | 10% adopt v2; Model Bridging enabled on Supernodes | v1 peers see v2 peers via translated queries |
 | 50% migration | Clients show migration prompt | Prompt triggered for v1 peers |
-| Post-migration (day 91) | v1 TTLs expire | v1 peers isolated in compatibility shard; v2 network intact |
+| Post-migration | v1 peers isolated without Supernodes | Bridging keeps network intact while users upgrade |
 
 ---
 
@@ -665,7 +666,6 @@ Once the simulation harness is in place (Phase 2), run the following as a schedu
 | Match threshold | 0.75 | Sweep 0.60–0.90 in 0.05 steps |
 | Tag-match bonus | 1.2× | Sweep 1.0–2.0 |
 | LSH hash count | 20 (High) | Sweep 8–32 |
-| Monte Carlo samples | 100 (High) | Sweep 20–200 |
 | DHT candidate cap | 100 (High) | Sweep 20–200 |
 | Refresh interval | 5 min (High) | Sweep 1–15 min |
 | Supernode rate limit | 10 req/min | Sweep 5–30 |
