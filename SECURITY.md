@@ -124,7 +124,6 @@ Peers accumulate reputation via successful interactions. Low-rep announcements d
 
 **Sybil resistance**:
 
-- **Proof-of-Work (Hashcash)**: Generating DHT announcements requires a computational proof (e.g., finding a SHA-256 hash with 16 leading zero bits). This adds a small cost (~1-2 seconds) for legitimate users but makes flooding the DHT prohibitively expensive for attackers.
 - Mutual signing requirement (both parties confirm interaction)
 - Time-weighted decay
 - 7-day bootstrapping period for new peers

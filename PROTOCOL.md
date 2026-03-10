@@ -197,8 +197,6 @@ function lshHash(vec: number[], seed: string, numHashes: number = 20, hashLen: n
 
 ### Announcement Payload
 
-To mitigate Sybil attacks on the permissionless DHT, announcements require a Proof-of-Work (Hashcash) computation.
-
 ```typescript
 interface SignedAnnouncement {
   peerID: string;           // libp2p peer ID (base58btc)
@@ -208,7 +206,6 @@ interface SignedAnnouncement {
   relTag?: string;          // optional relation tag for fused distributions
   ttl: number;              // seconds until expiry (default 300)
   updatedAt: number;        // Unix timestamp (ms)
-  nonce: number;            // Proof-of-Work nonce
   signature: Uint8Array;    // ed25519 signature
 }
 ```
@@ -240,14 +237,6 @@ async function announceChannel(channel: Channel, dists: Distribution[], modelHas
 ### Query Protocol
 
 ```javascript
-// Perform Proof-of-Work check
-function verifyPoW(announcement: SignedAnnouncement, targetZeros: number = 16): boolean {
-  const data = encode({...announcement, signature: new Uint8Array(0)});
-  const hash = sha256(data);
-  // Check if first targetZeros bits are 0
-  return countLeadingZeros(hash) >= targetZeros;
-}
-
 async function queryProximals(sample: number[], modelHash: string): Promise<PeerInfo[]> {
   const seen = new Set<string>();
   const candidates: PeerInfo[] = [];
