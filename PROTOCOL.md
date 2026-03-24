@@ -13,6 +13,7 @@ const PROTOCOL_ANNOUNCE = '/isc/announce/1.0';
 const PROTOCOL_POST = '/isc/post/1.0';
 const PROTOCOL_FOLLOW = '/isc/follow/1.0';
 const PROTOCOL_DM = '/isc/dm/1.0';
+const PROTOCOL_MAILBOX = '/isc/mailbox/1.0';
 ```
 
 ---
@@ -138,9 +139,9 @@ All DHT keys are prefixed by type for namespace isolation. This serves as the si
 
 > **Note**: Routing uses the `modelHash` (e.g., `abc123def456` for `all-MiniLM-L6-v2`) rather than `channelID` to ensure that identical thoughts in completely different channels naturally map to the same DHT space, enabling cross-topic serendipity.
 
-### LSH (Locality-Sensitive Hashing)
+### Multi-Probe LSH (Locality-Sensitive Hashing)
 
-Vectors are mapped to DHT keys via seeded random-projection LSH:
+Vectors are mapped to DHT keys via seeded random-projection LSH. To increase recall without amplifying DHT write traffic, ISC uses **Multi-Probe LSH**: clients write to a small number of base buckets, but when querying, they probe mathematically adjacent buckets (e.g., flipping 1 bit).
 
 ```javascript
 function seededRng(seed: string): () => number {
@@ -157,12 +158,13 @@ function seededRng(seed: string): () => number {
   };
 }
 
-function lshHash(vec: number[], seed: string, numHashes: number = 20, hashLen: number = 32): string[] {
+function lshHash(vec: number[], seed: string, baseHashes: number = 4, hashLen: number = 32, enableMultiProbe: boolean = true): string[] {
   const rng = seededRng(seed);
   const hashes: string[] = [];
 
-  for (let i = 0; i < numHashes; i++) {
+  for (let i = 0; i < baseHashes; i++) {
     let hashBits = '';
+    const dotProducts: number[] = [];
 
     // Each hash requires hashLen projections
     for (let h = 0; h < hashLen; h++) {
@@ -175,11 +177,24 @@ function lshHash(vec: number[], seed: string, numHashes: number = 20, hashLen: n
         dotProduct += vec[j] * proj[j];
       }
 
+      dotProducts.push(dotProduct);
       // 1 if positive, 0 if negative
       hashBits += dotProduct > 0 ? '1' : '0';
     }
 
     hashes.push(hashBits);
+
+    // Generate adjacent probes by flipping the bit of the projection closest to 0
+    if (enableMultiProbe) {
+      let minIdx = 0;
+      for (let h = 1; h < hashLen; h++) {
+        if (Math.abs(dotProducts[h]) < Math.abs(dotProducts[minIdx])) {
+          minIdx = h;
+        }
+      }
+      const flippedBits = hashBits.substring(0, minIdx) + (hashBits[minIdx] === '1' ? '0' : '1') + hashBits.substring(minIdx + 1);
+      hashes.push(flippedBits);
+    }
   }
 
   return hashes;
@@ -188,12 +203,12 @@ function lshHash(vec: number[], seed: string, numHashes: number = 20, hashLen: n
 
 **Tier-specific parameters:**
 
-| Tier | numHashes | candidateCap |
-|------|-----------|--------------|
-| High | 20 | 100 |
-| Mid | 12 | 50 |
-| Low | 8 | 20 |
-| Minimal | 6 | 10 |
+| Tier | baseHashes | candidateCap |
+|------|------------|--------------|
+| High | 4 | 100 |
+| Mid | 3 | 50 |
+| Low | 2 | 20 |
+| Minimal | 1 | 10 |
 
 ### Announcement Payload
 
@@ -214,7 +229,7 @@ interface SignedAnnouncement {
 
 ```javascript
 async function announceChannel(channel: Channel, dists: Distribution[], modelHash: string) {
-  const hashes = lshHash(dists[0].mu, modelHash, TIER.numHashes);
+  const hashes = lshHash(dists[0].mu, modelHash, TIER.baseHashes);
   
   for (let i = 0; i < Math.min(hashes.length, dists.length); i++) {
     const payload: SignedAnnouncement = {
@@ -294,23 +309,79 @@ async function handleChatStream(stream: Stream) {
 }
 ```
 
-### Dial Protocol
+### WebRTC Signaling, Mailboxes & Dial Protocol
+
+Because WebRTC requires SDP offer/answer exchange before connecting, peers use a dedicated Libp2p PubSub topic (`/isc/signal/<peerID>`) for signaling when online.
+
+To solve the "Browser Backgrounding" problem (where mobile OSs kill WebSockets), peers register a **Mailbox** with a community relay. These relays are community-operated, swappable, and do not decrypt the payloads. The Mailbox protocol (`/isc/mailbox/1.0`) buffers encrypted signaling messages and chat payloads.
+
+When a message arrives for a sleeping peer, the Mailbox relay triggers a standard **Web Push Notification** to wake the client's Service Worker, which retrieves the buffered messages, decrypts them, and establishes the WebRTC connection in the background.
+
+#### Mailbox Protocol Schemas (`/isc/mailbox/1.0`)
+
+When a peer sends an offline message, they wrap the standard `SignalMessage` in an ECIES-encrypted envelope targeted at the recipient's public key, then deliver it to the recipient's registered relay:
+
+```typescript
+interface MailboxEnvelope {
+  recipientID: string;
+  ephemeralPubKey: Uint8Array;  // Sender's ephemeral ECDH key
+  encryptedPayload: Uint8Array; // AES-GCM encrypted SignalMessage
+  iv: Uint8Array;               // Initialization vector
+  ttl: number;                  // Expiry timestamp (ms)
+}
+```
+
+The relay stores the `MailboxEnvelope` and immediately fires a Web Push Notification to the recipient. To prevent metadata leakage through the push service (e.g., Apple APNs or Google FCM), the push payload contains *no identifiable content*—only a wake-up trigger:
+
+```json
+{
+  "topic": "isc.wakeup",
+  "relayUrl": "wss://relay1.isc.network",
+  "msgCount": 1
+}
+```
+
+Upon waking, the Service Worker connects to the `relayUrl`, fetches pending `MailboxEnvelope`s, derives the shared secret via ECDH using the sender's `ephemeralPubKey` and the recipient's private key, decrypts the `SignalMessage`, and establishes the WebRTC DataChannel.
+
+```typescript
+interface SignalMessage {
+  type: 'offer' | 'answer' | 'candidate';
+  senderID: string;
+  payload: string; // SDP or ICE candidate
+  signature: Uint8Array; // Ed25519 signature of the payload
+}
+```
 
 ```javascript
 async function initiateChat(peerID: string, channel: Channel): Promise<Stream> {
+  // 1. Attempt PubSub signaling (fast path)
+  // node.pubsub.publish(`/isc/signal/${peerID}`, encode(offerSignal))
+
+  // 2. Fallback: If no PubSub ack, send to peer's registered Mailbox relay
+  // await sendToMailbox(peer.mailboxRelayID, peerID, offerSignal);
+
   const stream = await node.dialProtocol(peerID, PROTOCOL_CHAT);
   
   const greeting: ChatMessage = {
     channelID: channel.id,
     msg: 'Hey, our thoughts are proximal!',
     timestamp: Date.now(),
-    signature: await sign(encode(greeting), keypair.privateKey),
+    signature: await sign(encode(greeting), signingKeys.privateKey),
   };
   
   await stream.sink(encode(greeting));
   return stream;
 }
 ```
+
+### Global PubSub Firehose
+
+Instead of supernodes passively crawling the DHT (which violates Kademlia routing rules), all announcements are dual-published:
+
+1. Pushed to the target LSH keys in the DHT (for low-tier peer lookups).
+2. Broadcast to a global PubSub topic: `/isc/firehose/v1`.
+
+Supernodes subscribe to this firehose to continuously build and update their global HNSW indexes efficiently.
 
 ### Group Chat Formation
 

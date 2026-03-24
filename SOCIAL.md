@@ -394,19 +394,35 @@ async function getSuggestedFollows(channel: Channel, limit: number = 10): Promis
 }
 ```
 
-### Web of Trust
+### Web of Trust (Cryptographic Vouching)
+
+ISC uses a transitive Web of Trust to mitigate Sybil attacks without requiring servers or Proof-of-Work.
 
 ```typescript
 interface ReputationScore {
   peerID: string;
   score: number;        // 0.0 - 1.0
-  mutualFollows: number;
+  vouchedBy: string;    // peerID of the sponsor who invited them
   interactionHistory: Interaction[];
   halfLifeDays: number; // 30-day decay
 }
 
-// Mutual follows accumulate reputation scores
-// High-rep peers carry more weight in mute/flag propagation
+interface VouchEvent {
+  type: 'vouch';
+  voucher: string;
+  vouchee: string;
+  timestamp: number;
+  signature: Uint8Array; // Signed by voucher
+}
+
+#### Vouching Mechanics and Slashing Algorithms
+
+1. **Initial Vouching**: New peers require a `VouchEvent` from an existing peer to bypass low-tier rate limits. A peer cannot announce globally until they hold a verified vouch signature.
+2. **Reputation Inheritance**: The initial reputation score ($R_{new}$) of a vouched peer is a fraction of the voucher's reputation ($R_{voucher}$):
+   $$R_{new} = R_{voucher} \times 0.25$$
+3. **Slashing Penalty (Transitive Decay)**: If the vouchee engages in spam and gets muted/blocked by a network threshold of high-reputation peers, their reputation drops to 0. Crucially, the slashing propagates upstream to the voucher. The penalty ($P$) deducted from the voucher is:
+   $$P = (1.0 - R_{vouchee\_current}) \times 0.5$$
+   This creates an extreme economic disincentive to vouch for sybil nodes or bad actors, enforcing a natural limit on network pollution.
 ```
 
 ---
@@ -463,7 +479,7 @@ interface DirectMessage {
   encrypted: Uint8Array;  // E2E encrypted payload
 }
 
-// 1:1 or group WebRTC streams, E2E encrypted via libsodium
+// 1:1 or group WebRTC streams, E2E encrypted via ECDH/AES-GCM (Web Crypto API)
 async function sendDM(recipient: string, content: string): Promise<DirectMessage> {
   const encrypted = await encrypt(content, recipientPublicKey);
   

@@ -65,8 +65,8 @@ export function cosineSimilarity(a: number[], b: number[]): number;
 // LSH & DHT key generation
 export function lshHash(vec: number[], channelId: string, seed: string): string[];
 
-// Monte Carlo sampling
-export function sampleFromDistribution(mu: number[], sigma: number, n: number): number[][];
+// Analytical approximation of expected cosine similarity
+export function expectedCosineSimilarity(mu1: number[], sigma1: number, mu2: number[], sigma2: number): number;
 
 // Cryptography (uses Web Crypto API abstraction)
 export function generateKeypair(): Promise<Keypair>;
